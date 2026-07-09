@@ -1,0 +1,11 @@
+# Ignore everything in the target directory EXCEPT the maven wrapper
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Ignore docs and git
+*.md
+.git/
+.gitignore
+
+# Never copy local secrets into a docker image!
+.env
