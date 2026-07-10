@@ -365,3 +365,14 @@ CREATE INDEX IF NOT EXISTS idx_guest_email ON Guest(email);
 CREATE INDEX IF NOT EXISTS idx_reservation_dates ON Reservation(check_in_date, check_out_date);
 
 
+ -- Materialized Views (Data Analytics)
+CREATE MATERIALIZED VIEW MonthlyRevenueReport AS
+SELECT 
+    EXTRACT(YEAR FROM invoice_date) AS invoice_year,
+    EXTRACT(MONTH FROM invoice_date) AS invoice_month,
+    COUNT(invoice_id) AS total_invoices,
+    SUM(total_amount) AS total_revenue
+FROM Invoice
+WHERE status = 'PAID'
+GROUP BY EXTRACT(YEAR FROM invoice_date), EXTRACT(MONTH FROM invoice_date)
+ORDER BY invoice_year DESC, invoice_month DESC;
