@@ -639,3 +639,58 @@ DROP TRIGGER IF EXISTS trg_prevent_overpayment ON Payment;
 CREATE TRIGGER trg_prevent_overpayment
 BEFORE INSERT ON Payment
 FOR EACH ROW EXECUTE FUNCTION prevent_overpayment();
+
+-- -----------------------------------------------------------------------
+-- Trigger: update_invoice_status_on_payment
+-- Fires AFTER INSERT OR DELETE ON Payment.
+-- Automatically recalculates the total amount paid for an invoice and
+-- updates its status to 'Paid', 'Partially Paid', or 'Unpaid' unconditionally.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_invoice_status_on_payment()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_invoice_id     INT;
+    v_total_amount   DECIMAL(10, 2);
+    v_total_paid     DECIMAL(10, 2);
+    v_new_status     VARCHAR(50);
+BEGIN
+    -- Determine which invoice ID to use (NEW for insert, OLD for delete)
+    IF TG_OP = 'DELETE' THEN
+        v_invoice_id := OLD.invoice_id;
+    ELSE
+        v_invoice_id := NEW.invoice_id;
+    END IF;
+
+    -- Get the total amount of the invoice
+    SELECT total_amount INTO v_total_amount
+    FROM Invoice
+    WHERE invoice_id = v_invoice_id;
+
+    -- Calculate total paid so far
+    SELECT COALESCE(SUM(amount), 0) INTO v_total_paid
+    FROM Payment
+    WHERE invoice_id = v_invoice_id;
+
+    -- Determine new status
+    IF v_total_paid >= v_total_amount THEN
+        v_new_status := 'Paid';
+    ELSIF v_total_paid > 0 THEN
+        v_new_status := 'Partially Paid';
+    ELSE
+        v_new_status := 'Unpaid';
+    END IF;
+
+    -- Update the invoice status
+    UPDATE Invoice
+    SET status = v_new_status
+    WHERE invoice_id = v_invoice_id;
+
+    RETURN NULL; -- AFTER trigger
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_update_invoice_status ON Payment;
+CREATE TRIGGER trg_update_invoice_status
+AFTER INSERT OR DELETE ON Payment
+FOR EACH ROW EXECUTE FUNCTION update_invoice_status_on_payment();
+

@@ -236,3 +236,10 @@ Per the project's database-first architecture principle, the overpayment/underpa
 
 - **New trigger `trg_prevent_overpayment` (BEFORE INSERT on `Payment`)**: The function `prevent_overpayment()` acquires a `SELECT ... FOR UPDATE` lock on the target `Invoice` row, sums all existing payments for that invoice, and raises a `check_violation` exception if the new payment would cause the running total to exceed `Invoice.total_amount`. This rule now applies to every writer — the API, a direct `psql` script, or any future service — not just the single Java code path.
 - **`PaymentService` simplified**: The redundant Java sum/compare guard and the `getInvoiceByIdForUpdate` row-lock call have been removed. `createPayment` now simply calls `paymentRepository.save()` and lets the trigger enforce the constraint. Invoice status (`Paid` / `Partially Paid`) is still updated in Java after a successful insert, as that remains appropriate app-level logic.
+
+## DB-First Refactor — Invoice Status Trigger (Phase 6)
+
+Continuing the DB-first transition, the logic for updating the invoice status based on payments has been migrated to the database:
+
+- **New trigger `trg_update_invoice_status_on_payment` (AFTER INSERT OR DELETE ON `Payment`)**: The function `update_invoice_status_on_payment()` is triggered after any payment mutation. It calculates the total amount paid so far for the associated invoice and dynamically updates the invoice `status` to `'Paid'`, `'Partially Paid'`, or `'Unpaid'`. 
+- **`PaymentService` simplification**: The manual update to `Invoice.status` within Java has been fully removed. This guarantees that `Invoice.status` stays consistent regardless of how payments are entered (e.g. via direct script or other interfaces), closing the silent staleness loop.
