@@ -48,6 +48,7 @@ public class ReservationController {
     public ResponseEntity<String> updateReservation(@PathVariable int reservationId, @RequestBody Reservation reservation) {
         Reservation reservationToUpdate = new Reservation(
                 reservationId,
+                reservation.branchId(),
                 reservation.guestId(),
                 reservation.checkInDate(),
                 reservation.checkOutDate(),

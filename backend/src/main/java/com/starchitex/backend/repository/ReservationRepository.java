@@ -21,6 +21,7 @@ public class ReservationRepository {
 
     private final RowMapper<Reservation> reservationRowMapper = (rs, rowNum) -> new Reservation(
             rs.getInt("reservation_id"),
+            rs.getInt("branch_id"),
             rs.getInt("guest_id"),
             rs.getObject("check_in_date", LocalDate.class),
             rs.getObject("check_out_date", LocalDate.class),
@@ -48,9 +49,10 @@ public class ReservationRepository {
     }
 
     public int save(Reservation reservation) {
-        String sql = "INSERT INTO Reservation (guest_id, check_in_date, check_out_date, actual_checkin_time, actual_checkout_time, num_of_guests, status) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO Reservation (branch_id, guest_id, check_in_date, check_out_date, actual_checkin_time, actual_checkout_time, num_of_guests, status) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         return jdbcTemplate.update(sql,
+                reservation.branchId(),
                 reservation.guestId(),
                 reservation.checkInDate(),
                 reservation.checkOutDate(),
@@ -62,9 +64,10 @@ public class ReservationRepository {
     }
 
     public int update(Reservation reservation) {
-        String sql = "UPDATE Reservation SET guest_id = ?, check_in_date = ?, check_out_date = ?, actual_checkin_time = ?, actual_checkout_time = ?, num_of_guests = ?, status = ? " +
+        String sql = "UPDATE Reservation SET branch_id = ?, guest_id = ?, check_in_date = ?, check_out_date = ?, actual_checkin_time = ?, actual_checkout_time = ?, num_of_guests = ?, status = ? " +
                      "WHERE reservation_id = ?";
         return jdbcTemplate.update(sql,
+                reservation.branchId(),
                 reservation.guestId(),
                 reservation.checkInDate(),
                 reservation.checkOutDate(),

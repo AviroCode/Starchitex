@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS GuestCredentials (
 
 CREATE TABLE IF NOT EXISTS Reservation (
     reservation_id SERIAL PRIMARY KEY,
+    branch_id INT NOT NULL REFERENCES Branch(branch_id),
     guest_id INT NOT NULL REFERENCES Guest(guest_id),
     check_in_date DATE NOT NULL,
     check_out_date DATE NOT NULL,

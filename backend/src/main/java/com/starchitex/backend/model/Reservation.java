@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 public record Reservation(
     Integer reservationId,
+    Integer branchId,
     Integer guestId,
     LocalDate checkInDate,
     LocalDate checkOutDate,
