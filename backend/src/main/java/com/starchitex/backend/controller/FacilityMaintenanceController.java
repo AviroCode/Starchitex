@@ -4,6 +4,7 @@ import com.starchitex.backend.model.FacilityMaintenance;
 import com.starchitex.backend.service.FacilityMaintenanceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class FacilityMaintenanceController {
         return facilityMaintenanceService.getMaintenanceTicketsByFacilityId(facilityId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createMaintenanceTicket(@RequestBody FacilityMaintenance maintenance) {
         boolean isCreated = facilityMaintenanceService.createMaintenanceTicket(maintenance);
@@ -44,6 +46,7 @@ public class FacilityMaintenanceController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PutMapping("/{facilityMaintenanceId}")
     public ResponseEntity<String> updateMaintenanceTicket(@PathVariable int facilityMaintenanceId, @RequestBody FacilityMaintenance maintenance) {
         FacilityMaintenance maintenanceToUpdate = new FacilityMaintenance(

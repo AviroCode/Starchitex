@@ -4,6 +4,7 @@ import com.starchitex.backend.model.Facility;
 import com.starchitex.backend.service.FacilityService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class FacilityController {
         return facilityService.getFacilitiesByBranchId(branchId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createFacility(@RequestBody Facility facility) {
         boolean isCreated = facilityService.createFacility(facility);
@@ -44,6 +46,7 @@ public class FacilityController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PutMapping("/{id}")
     public ResponseEntity<String> updateFacility(@PathVariable int id, @RequestBody Facility facility) {
         Facility facilityToUpdate = new Facility(

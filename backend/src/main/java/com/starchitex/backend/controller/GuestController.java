@@ -18,13 +18,15 @@ public class GuestController {
         this.guestService = guestService;
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
+    // Guest is now RLS-protected (chain-wide directory: any staff member, any
+    // branch, or the guest themself) -- these checks are defense-in-depth only.
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @GetMapping
     public List<Guest> getAllGuests() {
         return guestService.getAllGuests();
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId == #id")
     @GetMapping("/{id}")
     public ResponseEntity<Guest> getGuestById(@PathVariable int id) {
         return guestService.getGuestById(id)
@@ -32,6 +34,7 @@ public class GuestController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createGuest(@RequestBody Guest guest) {
         boolean isCreated = guestService.createGuest(guest);
@@ -42,6 +45,7 @@ public class GuestController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId == #id")
     @PutMapping("/{id}")
     public ResponseEntity<String> updateGuest(@PathVariable int id, @RequestBody Guest guest) {
         Guest guestToUpdate = new Guest(

@@ -4,6 +4,7 @@ import com.starchitex.backend.model.InvoiceItem;
 import com.starchitex.backend.service.InvoiceItemService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class InvoiceItemController {
         return invoiceItemService.getInvoiceItemsByInvoiceId(invoiceId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createInvoiceItem(@RequestBody InvoiceItem item) {
         boolean isCreated = invoiceItemService.createInvoiceItem(item);
@@ -44,6 +46,7 @@ public class InvoiceItemController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PutMapping("/{invoiceItemId}")
     public ResponseEntity<String> updateInvoiceItem(@PathVariable int invoiceItemId, @RequestBody InvoiceItem item) {
         InvoiceItem itemToUpdate = new InvoiceItem(
@@ -65,6 +68,7 @@ public class InvoiceItemController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @DeleteMapping("/{invoiceItemId}")
     public ResponseEntity<String> deleteInvoiceItem(@PathVariable int invoiceItemId) {
         boolean isDeleted = invoiceItemService.deleteInvoiceItem(invoiceItemId);

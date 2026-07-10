@@ -4,6 +4,7 @@ import com.starchitex.backend.model.FacilityTask;
 import com.starchitex.backend.service.FacilityTaskService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class FacilityTaskController {
         return facilityTaskService.getTasksByFacilityId(facilityId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createTask(@RequestBody FacilityTask task) {
         boolean isCreated = facilityTaskService.createTask(task);
@@ -44,6 +46,7 @@ public class FacilityTaskController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PutMapping("/{facilitytaskId}")
     public ResponseEntity<String> updateTask(@PathVariable int facilitytaskId, @RequestBody FacilityTask task) {
         FacilityTask taskToUpdate = new FacilityTask(

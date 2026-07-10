@@ -51,14 +51,14 @@ public class CustomUserDetailsService implements UserDetailsService {
             if (empData.isPresent()) {
                 branchId = empData.get().branchId();
             }
-            return new CustomUserDetails(emp.username(), emp.passwordHash(), getAuthorities(emp.roleId()), branchId, null);
+            return new CustomUserDetails(emp.username(), emp.passwordHash(), getAuthorities(emp.roleId()), branchId, null, emp.employeeId());
         }
 
         // 2. If no employee, try finding a guest
         Optional<GuestCredentials> guestOpt = guestRepo.findByUsername(username);
         if (guestOpt.isPresent()) {
             GuestCredentials guest = guestOpt.get();
-            return new CustomUserDetails(guest.username(), guest.passwordHash(), getAuthorities(guest.roleId()), null, guest.guestId());
+            return new CustomUserDetails(guest.username(), guest.passwordHash(), getAuthorities(guest.roleId()), null, guest.guestId(), null);
         }
 
 

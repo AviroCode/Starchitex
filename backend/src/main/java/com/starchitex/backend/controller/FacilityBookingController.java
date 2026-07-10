@@ -4,6 +4,7 @@ import com.starchitex.backend.model.FacilityBooking;
 import com.starchitex.backend.service.FacilityBookingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class FacilityBookingController {
         return facilityBookingService.getBookingsByReservationId(reservationId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createBooking(@RequestBody FacilityBooking booking) {
         boolean isCreated = facilityBookingService.createBooking(booking);
@@ -44,6 +46,7 @@ public class FacilityBookingController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PutMapping("/{bookingId}")
     public ResponseEntity<String> updateBooking(@PathVariable int bookingId, @RequestBody FacilityBooking booking) {
         FacilityBooking bookingToUpdate = new FacilityBooking(

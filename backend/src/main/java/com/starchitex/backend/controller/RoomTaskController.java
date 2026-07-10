@@ -4,6 +4,7 @@ import com.starchitex.backend.model.RoomTask;
 import com.starchitex.backend.service.RoomTaskService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class RoomTaskController {
         return roomTaskService.getTasksByRoomId(roomId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createTask(@RequestBody RoomTask task) {
         boolean isCreated = roomTaskService.createTask(task);
@@ -44,6 +46,7 @@ public class RoomTaskController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PutMapping("/{roomtaskId}")
     public ResponseEntity<String> updateTask(@PathVariable int roomtaskId, @RequestBody RoomTask task) {
         RoomTask taskToUpdate = new RoomTask(

@@ -332,7 +332,7 @@ RETURNS TRIGGER AS $$
 BEGIN
     IF (TG_OP = 'DELETE') THEN
         INSERT INTO AuditLog(action, table_name, pk_of_table, old_value)
-        VALUES ('DELETE', 'Payment', OLD.payment_id::VARCHAR, 'Amount: ' || OLD.amount_paid || ', Method: ' || OLD.payment_method);
+        VALUES ('DELETE', 'Payment', OLD.payment_id::VARCHAR, 'Amount: ' || OLD.amount || ', Method: ' || OLD.payment_method);
         RETURN OLD;
     END IF;
     RETURN NULL;
@@ -894,10 +894,17 @@ $$ LANGUAGE plpgsql;
 ALTER TABLE Branch ENABLE ROW LEVEL SECURITY;
 ALTER TABLE Employee ENABLE ROW LEVEL SECURITY;
 ALTER TABLE Room ENABLE ROW LEVEL SECURITY;
+ALTER TABLE Facility ENABLE ROW LEVEL SECURITY;
+ALTER TABLE RoomAvailability ENABLE ROW LEVEL SECURITY;
 ALTER TABLE Reservation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ReservationRoom ENABLE ROW LEVEL SECURITY;
 ALTER TABLE Invoice ENABLE ROW LEVEL SECURITY;
+ALTER TABLE InvoiceItem ENABLE ROW LEVEL SECURITY;
 ALTER TABLE Payment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ServiceRequest ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ReservationStatusLog ENABLE ROW LEVEL SECURITY;
+ALTER TABLE Guest ENABLE ROW LEVEL SECURITY;
+ALTER TABLE AuditLog ENABLE ROW LEVEL SECURITY;
 ALTER TABLE RoomTask ENABLE ROW LEVEL SECURITY;
 ALTER TABLE FacilityTask ENABLE ROW LEVEL SECURITY;
 ALTER TABLE RoomMaintenance ENABLE ROW LEVEL SECURITY;
@@ -908,10 +915,17 @@ ALTER TABLE FacilityBooking ENABLE ROW LEVEL SECURITY;
 ALTER TABLE Branch FORCE ROW LEVEL SECURITY;
 ALTER TABLE Employee FORCE ROW LEVEL SECURITY;
 ALTER TABLE Room FORCE ROW LEVEL SECURITY;
+ALTER TABLE Facility FORCE ROW LEVEL SECURITY;
+ALTER TABLE RoomAvailability FORCE ROW LEVEL SECURITY;
 ALTER TABLE Reservation FORCE ROW LEVEL SECURITY;
 ALTER TABLE ReservationRoom FORCE ROW LEVEL SECURITY;
 ALTER TABLE Invoice FORCE ROW LEVEL SECURITY;
+ALTER TABLE InvoiceItem FORCE ROW LEVEL SECURITY;
 ALTER TABLE Payment FORCE ROW LEVEL SECURITY;
+ALTER TABLE ServiceRequest FORCE ROW LEVEL SECURITY;
+ALTER TABLE ReservationStatusLog FORCE ROW LEVEL SECURITY;
+ALTER TABLE Guest FORCE ROW LEVEL SECURITY;
+ALTER TABLE AuditLog FORCE ROW LEVEL SECURITY;
 ALTER TABLE RoomTask FORCE ROW LEVEL SECURITY;
 ALTER TABLE FacilityTask FORCE ROW LEVEL SECURITY;
 ALTER TABLE RoomMaintenance FORCE ROW LEVEL SECURITY;
@@ -922,9 +936,13 @@ ALTER TABLE FacilityBooking FORCE ROW LEVEL SECURITY;
 -- Policies
 -- -----------------------------------------------------------------------
 
--- Branch: Employees can see their own branch, Super Admins can see all
+-- Branch: Employees can see/manage their own branch, Super Admins can see all.
+-- Guests get a separate read-only SELECT policy below so they can browse branches to book.
 CREATE POLICY branch_isolation ON Branch FOR ALL USING (
     is_super_admin() OR branch_id = current_branch_id()
+);
+CREATE POLICY branch_guest_read ON Branch FOR SELECT USING (
+    current_guest_id() IS NOT NULL
 );
 
 -- Employee: Employees can see/manage employees in their own branch
@@ -932,9 +950,52 @@ CREATE POLICY employee_isolation ON Employee FOR ALL USING (
     is_super_admin() OR branch_id = current_branch_id()
 );
 
--- Room: Isolated by branch_id
+-- Room: Isolated by branch_id for staff. Guests get a read-only SELECT policy
+-- below so they can browse rooms across every branch to make a booking.
 CREATE POLICY room_isolation ON Room FOR ALL USING (
     is_super_admin() OR branch_id = current_branch_id()
+);
+CREATE POLICY room_guest_read ON Room FOR SELECT USING (
+    current_guest_id() IS NOT NULL
+);
+
+-- Facility: same pattern as Room (was previously unprotected by RLS entirely)
+CREATE POLICY facility_isolation ON Facility FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);
+CREATE POLICY facility_guest_read ON Facility FOR SELECT USING (
+    current_guest_id() IS NOT NULL
+);
+
+-- RoomAvailability: no branch_id of its own (was previously unprotected by RLS
+-- entirely), so derive it via room_id -> Room.branch_id. Guests get the same
+-- read-only carve-out as Room so they can check dates before booking.
+--
+-- USING also needs to make a guest's OWN reservation's rows visible: when a
+-- guest cancels their own reservation, trg_cleanup_on_reservation_cancel ->
+-- trg_sync_room_availability run in the SAME session (the guest's), and that
+-- cascade needs to see + update the RoomAvailability row it's freeing up.
+-- WITH CHECK is deliberately looser than USING: freeing a room (setting
+-- reservation_id back to NULL) is always safe regardless of who's doing it --
+-- the only thing that needs branch-gating is *claiming* a room for a branch's
+-- own inventory, not releasing one.
+CREATE POLICY room_availability_isolation ON RoomAvailability FOR ALL USING (
+    is_super_admin()
+    OR EXISTS (
+        SELECT 1 FROM Room r WHERE r.room_id = RoomAvailability.room_id AND r.branch_id = current_branch_id()
+    )
+    OR EXISTS (
+        SELECT 1 FROM Reservation res WHERE res.reservation_id = RoomAvailability.reservation_id AND res.guest_id = current_guest_id()
+    )
+) WITH CHECK (
+    is_super_admin()
+    OR EXISTS (
+        SELECT 1 FROM Room r WHERE r.room_id = RoomAvailability.room_id AND r.branch_id = current_branch_id()
+    )
+    OR reservation_id IS NULL
+);
+CREATE POLICY room_availability_guest_read ON RoomAvailability FOR SELECT USING (
+    current_guest_id() IS NOT NULL
 );
 
 -- Reservation: Isolated by branch_id for staff, or guest_id for guests
@@ -975,21 +1036,82 @@ CREATE POLICY payment_isolation ON Payment FOR ALL USING (
     )
 );
 
--- Tasks & Maintenance: Isolated by branch_id
+-- InvoiceItem: Inherits from Invoice -> Reservation
+CREATE POLICY invoice_item_isolation ON InvoiceItem FOR ALL USING (
+    is_super_admin()
+    OR EXISTS (
+        SELECT 1 FROM Invoice i
+        JOIN Reservation r ON i.reservation_id = r.reservation_id
+        WHERE i.invoice_id = InvoiceItem.invoice_id
+        AND (r.branch_id = current_branch_id() OR r.guest_id = current_guest_id())
+    )
+);
+
+-- ServiceRequest: Inherits from Reservation
+CREATE POLICY service_request_isolation ON ServiceRequest FOR ALL USING (
+    is_super_admin()
+    OR EXISTS (
+        SELECT 1 FROM Reservation r
+        WHERE r.reservation_id = ServiceRequest.reservation_id
+        AND (r.branch_id = current_branch_id() OR r.guest_id = current_guest_id())
+    )
+);
+
+-- ReservationStatusLog: Inherits from Reservation
+CREATE POLICY reservation_status_log_isolation ON ReservationStatusLog FOR ALL USING (
+    is_super_admin()
+    OR EXISTS (
+        SELECT 1 FROM Reservation r
+        WHERE r.reservation_id = ReservationStatusLog.reservation_id
+        AND (r.branch_id = current_branch_id() OR r.guest_id = current_guest_id())
+    )
+);
+
+-- Guest: chain-wide directory (a guest can stay at any branch, so guests are not
+-- owned by one branch the way Room/Employee are). Any staff member (any branch)
+-- or the guest themself may see/manage the row.
+CREATE POLICY guest_isolation ON Guest FOR ALL USING (
+    is_super_admin() OR current_branch_id() IS NOT NULL OR guest_id = current_guest_id()
+);
+
+-- AuditLog: security-sensitive, not branch data. Reads are super-admin only.
+-- Inserts must stay unconditionally allowed: the audit triggers (log_reservation_audit,
+-- log_invoice_audit, log_payment_audit, log_service_request_audit) run in the same
+-- session as the triggering statement, so with FORCE RLS and no INSERT policy their
+-- INSERTs would be rejected regardless of who fired the original statement.
+-- No UPDATE/DELETE policy is defined on purpose -- nothing should ever modify audit
+-- rows, and with FORCE ROW LEVEL SECURITY + no matching policy those are denied.
+CREATE POLICY audit_log_read ON AuditLog FOR SELECT USING (
+    is_super_admin()
+);
+CREATE POLICY audit_log_insert ON AuditLog FOR INSERT WITH CHECK (true);
+
+-- Tasks & Maintenance: none of these tables carry branch_id directly, so branch
+-- is derived via their Room/Facility foreign key.
 CREATE POLICY room_task_isolation ON RoomTask FOR ALL USING (
-    is_super_admin() OR branch_id = current_branch_id()
+    is_super_admin() OR EXISTS (
+        SELECT 1 FROM Room r WHERE r.room_id = RoomTask.room_id AND r.branch_id = current_branch_id()
+    )
 );
 CREATE POLICY facility_task_isolation ON FacilityTask FOR ALL USING (
-    is_super_admin() OR branch_id = current_branch_id()
+    is_super_admin() OR EXISTS (
+        SELECT 1 FROM Facility f WHERE f.facility_id = FacilityTask.facility_id AND f.branch_id = current_branch_id()
+    )
 );
 CREATE POLICY room_maintenance_isolation ON RoomMaintenance FOR ALL USING (
-    is_super_admin() OR branch_id = current_branch_id()
+    is_super_admin() OR EXISTS (
+        SELECT 1 FROM Room r WHERE r.room_id = RoomMaintenance.room_id AND r.branch_id = current_branch_id()
+    )
 );
 CREATE POLICY facility_maintenance_isolation ON FacilityMaintenance FOR ALL USING (
-    is_super_admin() OR branch_id = current_branch_id()
+    is_super_admin() OR EXISTS (
+        SELECT 1 FROM Facility f WHERE f.facility_id = FacilityMaintenance.facility_id AND f.branch_id = current_branch_id()
+    )
 );
 CREATE POLICY facility_booking_isolation ON FacilityBooking FOR ALL USING (
-    is_super_admin() OR branch_id = current_branch_id()
+    is_super_admin() OR EXISTS (
+        SELECT 1 FROM Facility f WHERE f.facility_id = FacilityBooking.facility_id AND f.branch_id = current_branch_id()
+    )
 );
 
 -- ====================================================================================

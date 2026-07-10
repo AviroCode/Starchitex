@@ -1,7 +1,14 @@
 -- =============================================================================
 -- Starchitex Hotel Management System — Canonical Seed Data
 -- Role names here MUST exactly match the strings in @PreAuthorize annotations.
--- =============================================================================
+--
+-- schema.sql enables Row-Level Security (with FORCE) on every tenant-scoped
+-- table (Branch, Employee, Room, Facility, RoomAvailability, Reservation,
+-- Guest, Invoice, Payment, etc.). A plain `psql -f` session has no branch or
+-- guest context set, so without the line below any INSERT into one of those
+-- tables is rejected with "new row violates row-level security policy" --
+-- this applies to every seed/data-loading script, not just this file.
+SET app.is_super_admin = 'true';
 
 -- Roles (10 canonical roles)
 INSERT INTO Role (role_id, role_name, description) VALUES

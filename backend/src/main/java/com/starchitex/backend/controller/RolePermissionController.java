@@ -6,6 +6,7 @@ import com.starchitex.backend.model.RolePermission;
 import com.starchitex.backend.service.RolePermissionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class RolePermissionController {
         return rolePermissionService.getRolesByPermissionId(permissionId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator')")
     @PostMapping
     public ResponseEntity<String> assignPermissionToRole(@RequestBody RolePermission rolePermission) {
         boolean isAssigned = rolePermissionService.assignPermissionToRole(rolePermission);
@@ -44,6 +46,7 @@ public class RolePermissionController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator')")
     @DeleteMapping("/role/{roleId}/permission/{permissionId}")
     public ResponseEntity<String> revokePermissionFromRole(@PathVariable int roleId, @PathVariable int permissionId) {
         boolean isRevoked = rolePermissionService.revokePermissionFromRole(roleId, permissionId);

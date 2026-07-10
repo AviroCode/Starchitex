@@ -154,7 +154,7 @@ Users log in with a username (or email). Passwords are never stored in plain tex
 Access is granted strictly by role. A user's `role_id` maps (through `RolePermission`) to a set of permissions, and the application exposes only the views and actions those permissions allow.
 
 ### Data Isolation
-Branch isolation is enforced with Row-Level Security (RLS) at the database layer, or via strict Data Access Objects (DAOs) in the backend, so that (for example) a receptionist only ever sees data for their own branch.
+Branch isolation is enforced with native PostgreSQL Row-Level Security (RLS) — `schema.sql` defines `CREATE POLICY` rules on every tenant-scoped table, keyed off session variables (`app.current_branch_id`, `app.current_guest_id`, `app.is_super_admin`) that the backend sets per-connection. This means a receptionist only ever sees data for their own branch even if an application-layer check is ever missed, and guests get a read-only carve-out on `Room`/`Branch`/`Facility` so they can browse and book across the chain. `@PreAuthorize` checks in the backend are defense-in-depth on top of this, not the primary enforcement mechanism.
 
 ### Audit Logging
 Every sensitive action is written to `AuditLog`. This table is **append-only** — `UPDATE` and `DELETE` permissions are revoked for all database users so the record cannot be tampered with.
@@ -166,72 +166,54 @@ Regular automated backups and a tested restore procedure protect against data lo
 
 ## 👥 Roles
 
+These are the canonical 10 roles, seeded exactly as-is by `database/seed/data.sql` (the `@PreAuthorize` checks in the backend match these role names literally).
+
 | # | Role | Branch Access | Description |
 |---|------|---------------|-------------|
-| 1 | System Administrator | All branches | Oversees entire system configuration and security. |
-| 2 | Branch Manager | Own branch | Oversees branch operations, occupancy, and reports. |
-| 3 | Front Desk Receptionist | Own branch | Manages guest registrations and reservations. |
-| 4 | Housekeeping Staff | Own branch | Manages room cleaning and status updates. |
-| 5 | Maintenance Staff | Own branch | Manages room repairs and facility maintenance. |
-| 6 | Restaurant / Room Service Staff | Own branch | Manages food orders and room service. |
-| 7 | Sales Executive | All branches | Handles corporate bookings and promotions. |
-| 8 | Accountant / Cashier | Own branch | Processes payments and financial records. |
-| 9 | Hotel Owner / Regional Director | All branches | Monitors cross-branch performance and reports. |
-| 10 | Guest | N/A | Manages personal profile and bookings. |
+| 1 | System Administrator | All branches | Full system access across all branches. |
+| 2 | Hotel Owner | All branches | Strategic oversight; cross-branch read/write. |
+| 3 | Sales Executive | All branches | Cross-branch reservations and guest management. |
+| 4 | Branch Manager | Own branch | Full management of own branch. |
+| 5 | Front Desk Receptionist | Own branch | Check-in/out, room assignment, guest lookup at own branch. |
+| 6 | Housekeeping Staff | Own branch | Room tasks and maintenance at own branch. |
+| 7 | Maintenance Technician | Own branch | Facility and room maintenance at own branch. |
+| 8 | Finance Manager | Own branch | Invoice and payment management at own branch. |
+| 9 | HR Manager | Own branch | Employee management at own branch. |
+| 10 | Guest | N/A | Self-service: view own reservations and invoices. |
 
 ### RBAC Access Matrix
 
-| # | Role | Table / Data Access | Cannot Do |
-|---|------|--------------------|-----------|
-| 1 | System Administrator | Users, Roles, Permissions, Branches, Employees, Guests, Reservations, Rooms, Invoices, Services, Maintenance, Housekeeping, Audit Logs | Perform hotel operations (cleaning rooms, checking guests in) |
-| 2 | Branch Manager | Employees, Rooms, Reservations, Guests, Bills, Maintenance, Housekeeping, Service Requests, Reports | View other branches; change RBAC; create admins |
-| 3 | Front Desk Receptionist | Guests, Reservations, Rooms, Payments, Invoices, Service Requests | Employee salaries; other branches; audit logs; housekeeping/maintenance schedules |
-| 4 | Housekeeping Staff | Assigned rooms, cleaning schedule, housekeeping tasks | Guest payments; employee info; reservations |
-| 5 | Maintenance Staff | Maintenance requests, rooms, equipment | Reservations; guests; payments |
-| 6 | Restaurant / Room Service Staff | Room service orders, guest room number | Guest personal info; payments; reservations |
-| 7 | Sales Executive | Corporate customers, group reservations, promotional packages | Employee info; housekeeping; maintenance; audit logs |
-| 8 | Accountant / Cashier | Payments, invoices, reservation charges, taxes | Employee roles; housekeeping; maintenance |
-| 9 | Hotel Owner / Regional Director | Reports, revenue, reservations, employees, guests | Modify daily operations; assign cleaning tasks |
-| 10 | Guest | Own reservations, own invoices, own profile | Other guests' data; hotel operations; staff info |
+Derived directly from the `RolePermission` rows in `database/seed/data.sql`.
+
+| # | Role | Permissions Granted | Table / Data Access |
+|---|------|---------------------|----------------------|
+| 1 | System Administrator | All 11 permissions | Everything — all branches, all tables |
+| 2 | Hotel Owner | VIEW_ALL_BRANCHES, MANAGE_EMPLOYEES, MANAGE_ROOMS, MANAGE_RESERVATIONS, VIEW_INVOICES, MANAGE_INVOICES, VIEW_GUESTS, MANAGE_GUESTS, VIEW_AUDIT_LOGS | Employees, Rooms, Reservations, Invoices, Guests, Audit Logs — all branches |
+| 3 | Sales Executive | VIEW_ALL_BRANCHES, MANAGE_RESERVATIONS, VIEW_INVOICES, VIEW_GUESTS, MANAGE_GUESTS | Reservations, Invoices (read), Guests — all branches |
+| 4 | Branch Manager | MANAGE_EMPLOYEES, MANAGE_ROOMS, MANAGE_RESERVATIONS, VIEW_INVOICES, MANAGE_INVOICES, VIEW_GUESTS, MANAGE_GUESTS, VIEW_AUDIT_LOGS, MANAGE_TASKS | Employees, Rooms, Reservations, Invoices, Guests, Audit Logs, Tasks — own branch only |
+| 5 | Front Desk Receptionist | MANAGE_ROOMS, MANAGE_RESERVATIONS, VIEW_INVOICES, MANAGE_INVOICES, VIEW_GUESTS, MANAGE_GUESTS | Rooms, Reservations, Invoices, Guests — own branch only |
+| 6 | Housekeeping Staff | MANAGE_TASKS | Room/Facility housekeeping tasks — own branch only |
+| 7 | Maintenance Technician | MANAGE_TASKS | Room/Facility maintenance tasks — own branch only |
+| 8 | Finance Manager | VIEW_INVOICES, MANAGE_INVOICES | Invoices, Payments — own branch only |
+| 9 | HR Manager | MANAGE_EMPLOYEES, VIEW_GUESTS | Employees — own branch only; Guests (read) |
+| 10 | Guest | VIEW_OWN_RESERVATION | Own reservations and invoices only |
 
 ---
 
-## 🔑 Permission Catalog (35 Permissions)
+## 🔑 Permission Catalog (11 Permissions)
 
-| ID | Permission | Module | Description |
-|----|-----------|--------|-------------|
-| 1 | VIEW_GUEST | Guest | View guest information |
-| 2 | CREATE_GUEST | Guest | Register a new guest |
-| 3 | UPDATE_GUEST | Guest | Edit guest information |
-| 4 | DELETE_GUEST | Guest | Remove guest record |
-| 5 | VIEW_RESERVATION | Reservation | View reservations |
-| 6 | CREATE_RESERVATION | Reservation | Create a reservation |
-| 7 | UPDATE_RESERVATION | Reservation | Modify reservation |
-| 8 | CANCEL_RESERVATION | Reservation | Cancel reservation |
-| 9 | CHECK_IN | Reservation | Check guest in |
-| 10 | CHECK_OUT | Reservation | Check guest out |
-| 11 | VIEW_ROOM | Room | View room details |
-| 12 | UPDATE_ROOM_STATUS | Room | Change room status |
-| 13 | VIEW_PAYMENT | Payment | View payment records |
-| 14 | PROCESS_PAYMENT | Payment | Record a payment |
-| 15 | ISSUE_REFUND | Payment | Refund a payment |
-| 16 | VIEW_INVOICE | Invoice | View invoices |
-| 17 | CREATE_INVOICE | Invoice | Generate invoices |
-| 18 | VIEW_SERVICE_REQUEST | Service | View service requests |
-| 19 | CREATE_SERVICE_REQUEST | Service | Create service requests |
-| 20 | UPDATE_SERVICE_REQUEST | Service | Update service request status |
-| 21 | VIEW_HOUSEKEEPING_TASK | Housekeeping | View cleaning tasks |
-| 22 | ASSIGN_HOUSEKEEPING_TASK | Housekeeping | Assign cleaning tasks |
-| 23 | COMPLETE_HOUSEKEEPING_TASK | Housekeeping | Mark cleaning complete |
-| 24 | VIEW_MAINTENANCE | Maintenance | View maintenance requests |
-| 25 | CREATE_MAINTENANCE | Maintenance | Report maintenance issue |
-| 26 | UPDATE_MAINTENANCE | Maintenance | Update maintenance status |
-| 27 | VIEW_EMPLOYEE | Employee | View employee records |
-| 28 | CREATE_EMPLOYEE | Employee | Add employee |
-| 29 | UPDATE_EMPLOYEE | Employee | Edit employee |
-| 30 | DELETE_EMPLOYEE | Employee | Remove employee |
-| 31 | VIEW_REPORT | Report | View reports |
-| 32 | GENERATE_REPORT | Report | Generate reports |
-| 33 | MANAGE_USERS | Security | Create/update user accounts |
-| 34 | MANAGE_ROLES | Security | Assign roles |
-| 35 | VIEW_AUDIT_LOG | Security | View audit logs |
+Matches `database/seed/data.sql` exactly.
+
+| ID | Permission | Description |
+|----|-----------|-------------|
+| 1 | VIEW_ALL_BRANCHES | Read data from any branch |
+| 2 | MANAGE_EMPLOYEES | Create and update employee records |
+| 3 | MANAGE_ROOMS | Create and update room records |
+| 4 | MANAGE_RESERVATIONS | Create, confirm, check-in, check-out reservations |
+| 5 | VIEW_INVOICES | Read invoice records |
+| 6 | MANAGE_INVOICES | Create invoice items and process payments |
+| 7 | VIEW_GUESTS | Read guest profile data |
+| 8 | MANAGE_GUESTS | Create and update guest profiles |
+| 9 | VIEW_OWN_RESERVATION | Guest self-service: read own reservations |
+| 10 | VIEW_AUDIT_LOGS | Read audit log entries |
+| 11 | MANAGE_TASKS | Create and update room/facility tasks |

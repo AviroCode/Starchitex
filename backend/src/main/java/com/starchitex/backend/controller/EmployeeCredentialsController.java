@@ -4,6 +4,7 @@ import com.starchitex.backend.model.EmployeeCredentials;
 import com.starchitex.backend.service.EmployeeCredentialsService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,11 +19,13 @@ public class EmployeeCredentialsController {
         this.employeeCredentialsService = employeeCredentialsService;
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator')")
     @GetMapping
     public List<EmployeeCredentials> getAllCredentials() {
         return employeeCredentialsService.getAllCredentials();
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator') or #employeeId == authentication.principal.employeeId")
     @GetMapping("/{employeeId}")
     public ResponseEntity<EmployeeCredentials> getCredentialsById(@PathVariable int employeeId) {
         return employeeCredentialsService.getCredentialsById(employeeId)
@@ -30,6 +33,7 @@ public class EmployeeCredentialsController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator')")
     @PostMapping
     public ResponseEntity<String> createCredentials(@RequestBody EmployeeCredentials credentials) {
         boolean isCreated = employeeCredentialsService.createCredentials(credentials);
@@ -40,6 +44,7 @@ public class EmployeeCredentialsController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator') or #employeeId == authentication.principal.employeeId")
     @PutMapping("/{employeeId}/password")
     public ResponseEntity<String> updatePassword(@PathVariable int employeeId, @RequestBody String newPasswordHash) {
         boolean isUpdated = employeeCredentialsService.updatePassword(employeeId, newPasswordHash);
@@ -50,6 +55,7 @@ public class EmployeeCredentialsController {
         }
     }
     
+    @PreAuthorize("hasAnyRole('System Administrator') or #employeeId == authentication.principal.employeeId")
     @PutMapping("/{employeeId}/login")
     public ResponseEntity<String> recordLogin(@PathVariable int employeeId) {
         boolean isUpdated = employeeCredentialsService.updateLastLogin(employeeId, LocalDateTime.now());

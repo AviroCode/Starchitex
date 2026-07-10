@@ -4,6 +4,7 @@ import com.starchitex.backend.model.Branch;
 import com.starchitex.backend.service.BranchService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class BranchController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator')")
     @PostMapping
     public ResponseEntity<String> createBranch(@RequestBody Branch branch) {
         boolean isCreated = branchService.createBranch(branch);
@@ -40,6 +42,7 @@ public class BranchController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator')")
     @PutMapping("/{id}")
     public ResponseEntity<String> updateBranch(@PathVariable int id, @RequestBody Branch branch) {
         Branch branchToUpdate = new Branch(
