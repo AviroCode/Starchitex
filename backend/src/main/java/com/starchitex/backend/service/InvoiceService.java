@@ -3,6 +3,7 @@ package com.starchitex.backend.service;
 import com.starchitex.backend.model.Invoice;
 import com.starchitex.backend.repository.InvoiceRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +33,8 @@ public class InvoiceService {
         return invoiceRepository.findByPayerGuestId(payerGuestId);
     }
 
+    // Ensures atomicity. If a complex operation fails mid-way, the database rolls back.
+    @Transactional
     public boolean createInvoice(Invoice invoice) {
         return invoiceRepository.save(invoice) > 0;
     }

@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS Facility (
     location VARCHAR(255)
 );
 
+
+
 CREATE TABLE IF NOT EXISTS Room (
     room_id SERIAL PRIMARY KEY,
     room_number VARCHAR(50) NOT NULL,
@@ -254,3 +256,112 @@ CREATE TABLE IF NOT EXISTS Payment (
     payment_method VARCHAR(50) NOT NULL,
     transaction_ref VARCHAR(255)
 );
+
+-- 6. Triggers and Functions (PL/pgSQL)
+
+-- Function to automatically log reservation cancellations and deletions into AuditLog
+CREATE OR REPLACE FUNCTION log_reservation_audit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'DELETE') THEN
+        INSERT INTO AuditLog(action, table_name, pk_of_table, old_value)
+        VALUES ('DELETE', 'Reservation', OLD.reservation_id::VARCHAR, 'Guest ID: ' || OLD.guest_id || ', Status: ' || OLD.status);
+        RETURN OLD;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        IF (OLD.status <> NEW.status AND NEW.status = 'CANCELLED') THEN
+            INSERT INTO AuditLog(action, table_name, pk_of_table, affected_col, old_value, new_value)
+            VALUES ('UPDATE_CANCEL', 'Reservation', OLD.reservation_id::VARCHAR, 'status', OLD.status, NEW.status);
+        END IF;
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to execute the function on Reservation changes
+DROP TRIGGER IF EXISTS trg_reservation_audit ON Reservation;
+CREATE TRIGGER trg_reservation_audit
+AFTER UPDATE OR DELETE ON Reservation
+FOR EACH ROW
+EXECUTE FUNCTION log_reservation_audit();
+
+-- 7. Standalone Stored Procedures (PL/pgSQL)
+
+-- Function to dynamically calculate and update an invoice's total
+CREATE OR REPLACE FUNCTION calculate_invoice_total(p_invoice_id INT)
+RETURNS DECIMAL(10, 2) AS $$
+DECLARE
+    v_sub_total DECIMAL(10, 2);
+    v_discount DECIMAL(10, 2);
+    v_tax_amount DECIMAL(10, 2);
+    v_total_amount DECIMAL(10, 2);
+    TAX_RATE CONSTANT DECIMAL(10, 2) := 0.07; -- 7% Tax
+BEGIN
+    -- 1. Calculate the sub_total from all associated InvoiceItems
+    SELECT COALESCE(SUM(quantity * amount), 0) INTO v_sub_total
+    FROM InvoiceItem
+    WHERE invoice_id = p_invoice_id;
+
+    -- 2. Get the current discount from the Invoice table
+    SELECT COALESCE(discount, 0) INTO v_discount
+    FROM Invoice
+    WHERE invoice_id = p_invoice_id;
+
+    -- 3. Calculate Tax (7% of the discounted sub-total)
+    v_tax_amount := GREATEST(0, (v_sub_total - v_discount) * TAX_RATE);
+
+    -- 4. Calculate Final Total
+    v_total_amount := GREATEST(0, (v_sub_total - v_discount) + v_tax_amount);
+
+    -- 5. Update the Invoice table with the new calculated values
+    UPDATE Invoice
+    SET sub_total = v_sub_total,
+        tax_amount = v_tax_amount,
+        total_amount = v_total_amount
+    WHERE invoice_id = p_invoice_id;
+
+    -- 6. Return the final total
+    RETURN v_total_amount;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 8. Check Constraints (Data Integrity)
+
+-- Ensure RoomType capacity and base price are valid
+ALTER TABLE RoomType ADD CONSTRAINT chk_roomtype_capacity CHECK (capacity > 0);
+ALTER TABLE RoomType ADD CONSTRAINT chk_roomtype_price CHECK (base_price >= 0);
+
+-- Ensure Service pricing is valid
+ALTER TABLE Service ADD CONSTRAINT chk_service_price CHECK (price >= 0);
+
+-- Ensure Reservation dates are logical (Checkout must be strictly after Check-in)
+ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_dates CHECK (check_out_date > check_in_date);
+ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_guests CHECK (num_of_guests > 0);
+
+-- Ensure Facility Booking times are logical
+ALTER TABLE FacilityBooking ADD CONSTRAINT chk_facility_booking_times CHECK (end_date_time > start_date_time);
+
+-- Ensure Invoice amounts are not negative
+ALTER TABLE Invoice ADD CONSTRAINT chk_invoice_amounts CHECK (sub_total >= 0 AND tax_amount >= 0 AND discount >= 0 AND total_amount >= 0);
+ALTER TABLE InvoiceItem ADD CONSTRAINT chk_invoice_item_amount CHECK (amount >= 0 AND quantity > 0);
+
+
+
+-- ====================================================================================
+-- 9. Views (Virtual Tables)
+-- ====================================================================================
+CREATE OR REPLACE VIEW AvailableRoomsToday AS 
+SELECT r.room_id, r.room_number, r.floor, rt.type_name, ra.price_override, ra.status 
+FROM Room r
+JOIN RoomType rt ON r.room_type_id = rt.room_type_id
+JOIN RoomAvailability ra ON r.room_id = ra.room_id
+WHERE ra.status = 'AVAILABLE' AND ra.calendar_date = CURRENT_DATE;
+
+-- Indexes (Performance Optimization)
+-- Speeds up login and guest lookup
+CREATE INDEX IF NOT EXISTS idx_guest_email ON Guest(email);
+
+-- SPEED UP SEARCHING FOR THE RESERVATIONS BETWEEN CERTAIN DATES 
+CREATE INDEX IF NOT EXISTS idx_reservation_dates ON Reservation(check_in_date, check_out_date);
+
+

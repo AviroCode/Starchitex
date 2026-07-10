@@ -4,3 +4,4 @@ target/
 *.jar
 .idea/
 .vscode/
+backend/src/main/resources/db_security_grants.sql

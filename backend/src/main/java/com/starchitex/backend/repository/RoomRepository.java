@@ -61,4 +61,19 @@ public class RoomRepository {
                 room.roomId()
         );
     }
+
+    private final RowMapper<com.starchitex.backend.model.AvailableRoomDTO> availableRoomRowMapper = (rs, rowNum) -> new com.starchitex.backend.model.AvailableRoomDTO(
+            rs.getInt("room_id"),
+            rs.getString("room_number"),
+            rs.getObject("floor") != null ? rs.getInt("floor") : null,
+            rs.getString("type_name"),
+            rs.getBigDecimal("price_override"),
+            rs.getString("status")
+    );
+
+    // Queries the 'AvailableRoomsToday' SQL View
+    public List<com.starchitex.backend.model.AvailableRoomDTO> findAvailableRoomsForToday() {
+        String sql = "SELECT * FROM AvailableRoomsToday";
+        return jdbcTemplate.query(sql, availableRoomRowMapper);
+    }
 }
