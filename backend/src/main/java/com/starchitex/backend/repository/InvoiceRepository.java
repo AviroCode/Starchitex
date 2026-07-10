@@ -79,4 +79,22 @@ public class InvoiceRepository {
                 invoice.invoiceId()
         );
     }
+
+    private final RowMapper<com.starchitex.backend.model.MonthlyRevenueDTO> monthlyRevenueRowMapper = (rs, rowNum) -> new com.starchitex.backend.model.MonthlyRevenueDTO(
+            rs.getInt("invoice_year"),
+            rs.getInt("invoice_month"),
+            rs.getInt("total_invoices"),
+            rs.getBigDecimal("total_revenue")
+    );
+
+    // Queries the 'MonthlyRevenueReport' Materialized View
+    public List<com.starchitex.backend.model.MonthlyRevenueDTO> getMonthlyRevenueReport() {
+        String sql = "SELECT * FROM MonthlyRevenueReport";
+        return jdbcTemplate.query(sql, monthlyRevenueRowMapper);
+    }
+
+    // Refreshes the Materialized View physical cache
+    public void refreshMonthlyRevenueReport() {
+        jdbcTemplate.execute("REFRESH MATERIALIZED VIEW MonthlyRevenueReport");
+    }
 }

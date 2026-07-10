@@ -4,6 +4,7 @@ import com.starchitex.backend.model.Invoice;
 import com.starchitex.backend.repository.InvoiceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,5 +42,12 @@ public class InvoiceService {
 
     public boolean updateInvoice(Invoice invoice) {
         return invoiceRepository.update(invoice) > 0;
+    }
+
+    // Spring Boot Scheduler: Runs automatically every night at 2:00 AM
+    @Scheduled(cron = "0 0 2 * * ?")
+    public void refreshAnalyticsCache() {
+        invoiceRepository.refreshMonthlyRevenueReport();
+        System.out.println("Analytics Materialized View Refreshed.");
     }
 }
