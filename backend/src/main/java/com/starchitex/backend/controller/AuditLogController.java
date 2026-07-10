@@ -2,7 +2,6 @@ package com.starchitex.backend.controller;
 
 import com.starchitex.backend.model.AuditLog;
 import com.starchitex.backend.service.AuditLogService;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

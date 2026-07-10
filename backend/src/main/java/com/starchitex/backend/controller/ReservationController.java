@@ -18,11 +18,13 @@ public class ReservationController {
         this.reservationService = reservationService;
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping
     public List<Reservation> getAllReservations() {
         return reservationService.getAllReservations();
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping("/{reservationId}")
     public ResponseEntity<Reservation> getReservationById(@PathVariable int reservationId) {
         return reservationService.getReservationById(reservationId)
@@ -30,12 +32,13 @@ public class ReservationController {
                 .orElse(ResponseEntity.notFound().build());
     }
     
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping("/guest/{guestId}")
     public List<Reservation> getReservationsByGuestId(@PathVariable int guestId) {
         return reservationService.getReservationsByGuestId(guestId);
     }
 
-    @PreAuthorize("hasAuthority('ADMIN') or #reservation.branchId() == authentication.principal.branchId")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or #reservation.branchId() == authentication.principal.branchId")
     @PostMapping
     public ResponseEntity<String> createReservation(@RequestBody Reservation reservation) {
         boolean isCreated = reservationService.createReservation(reservation);

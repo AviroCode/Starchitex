@@ -18,11 +18,13 @@ public class RoomController {
         this.roomService = roomService;
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping
     public List<Room> getAllRooms() {
         return roomService.getAllRooms();
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping("/{id}")
     public ResponseEntity<Room> getRoomById(@PathVariable int id) {
         return roomService.getRoomById(id)
@@ -30,12 +32,13 @@ public class RoomController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or #branchId == authentication.principal.branchId")
     @GetMapping("/branch/{branchId}")
     public List<Room> getRoomsByBranchId(@PathVariable int branchId) {
         return roomService.getRoomsByBranchId(branchId);
     }
 
-    @PreAuthorize("hasAuthority('ADMIN') or #room.branchId() == authentication.principal.branchId")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or #room.branchId() == authentication.principal.branchId")
     @PostMapping
     public ResponseEntity<String> createRoom(@RequestBody Room room) {
         boolean isCreated = roomService.createRoom(room);
@@ -46,7 +49,7 @@ public class RoomController {
         }
     }
 
-    @PreAuthorize("hasAuthority('ADMIN') or #room.branchId() == authentication.principal.branchId")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or #room.branchId() == authentication.principal.branchId")
     @PutMapping("/{id}")
     public ResponseEntity<String> updateRoom(@PathVariable int id, @RequestBody Room room) {
         Room roomToUpdate = new Room(

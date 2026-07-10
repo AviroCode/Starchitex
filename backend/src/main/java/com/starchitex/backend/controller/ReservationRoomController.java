@@ -5,6 +5,10 @@ import com.starchitex.backend.model.Room;
 import com.starchitex.backend.service.ReservationRoomService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.starchitex.backend.service.ReservationService;
+import com.starchitex.backend.model.Reservation;
+import java.util.Optional;
 
 import java.util.List;
 
@@ -13,9 +17,11 @@ import java.util.List;
 public class ReservationRoomController {
 
     private final ReservationRoomService reservationRoomService;
+    private final ReservationService reservationService;
 
-    public ReservationRoomController(ReservationRoomService reservationRoomService) {
+    public ReservationRoomController(ReservationRoomService reservationRoomService, ReservationService reservationService) {
         this.reservationRoomService = reservationRoomService;
+        this.reservationService = reservationService;
     }
 
     @GetMapping
@@ -33,14 +39,24 @@ public class ReservationRoomController {
         return reservationRoomService.getReservationIdsByRoomId(roomId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or @reservationRoomController.isAuthorizedBranch(#reservationRoom.reservationId(), authentication.principal.branchId)")
     @PostMapping
     public ResponseEntity<String> assignRoomToReservation(@RequestBody ReservationRoom reservationRoom) {
-        boolean isAssigned = reservationRoomService.assignRoomToReservation(reservationRoom);
-        if (isAssigned) {
-            return ResponseEntity.status(201).body("Room assigned to reservation successfully!");
-        } else {
-            return ResponseEntity.status(400).body("Failed to assign room to reservation.");
+        try {
+            boolean isAssigned = reservationRoomService.assignRoomToReservation(reservationRoom);
+            if (isAssigned) {
+                return ResponseEntity.status(201).body("Room assigned to reservation successfully!");
+            } else {
+                return ResponseEntity.status(400).body("Failed to assign room to reservation.");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body("Error: " + e.getMessage());
         }
+    }
+
+    public boolean isAuthorizedBranch(int reservationId, Integer userBranchId) {
+        Optional<Reservation> res = reservationService.getReservationById(reservationId);
+        return res.isPresent() && res.get().branchId().equals(userBranchId);
     }
 
     @DeleteMapping("/reservation/{reservationId}/room/{roomId}")

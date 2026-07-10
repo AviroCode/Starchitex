@@ -17,13 +17,22 @@ public class InvoiceItemRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    private final RowMapper<InvoiceItem> invoiceItemRowMapper = (rs, rowNum) -> new InvoiceItem(
-            rs.getInt("invoice_item_id"),
-            rs.getInt("invoice_id"),
-            rs.getString("item_type"),
-            rs.getInt("quantity"),
-            rs.getBigDecimal("amount")
-    );
+    private final RowMapper<InvoiceItem> invoiceItemRowMapper = (rs, rowNum) -> {
+        int rawRoomId = rs.getInt("room_id");
+        Integer roomId = rs.wasNull() ? null : rawRoomId;
+        int rawServiceId = rs.getInt("service_id");
+        Integer serviceId = rs.wasNull() ? null : rawServiceId;
+        return new InvoiceItem(
+                rs.getInt("invoice_item_id"),
+                rs.getInt("invoice_id"),
+                roomId,
+                serviceId,
+                rs.getString("item_type"),
+                rs.getInt("quantity"),
+                rs.getBigDecimal("amount"),
+                rs.getString("description")
+        );
+    };
 
     public List<InvoiceItem> findAll() {
         String sql = "SELECT * FROM InvoiceItem";
@@ -42,22 +51,28 @@ public class InvoiceItemRepository {
     }
 
     public int save(InvoiceItem item) {
-        String sql = "INSERT INTO InvoiceItem (invoice_id, item_type, quantity, amount) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO InvoiceItem (invoice_id, room_id, service_id, item_type, quantity, amount, description) VALUES (?, ?, ?, ?, ?, ?, ?)";
         return jdbcTemplate.update(sql,
                 item.invoiceId(),
+                item.roomId(),
+                item.serviceId(),
                 item.itemType(),
                 item.quantity(),
-                item.amount()
+                item.amount(),
+                item.description()
         );
     }
 
     public int update(InvoiceItem item) {
-        String sql = "UPDATE InvoiceItem SET invoice_id = ?, item_type = ?, quantity = ?, amount = ? WHERE invoice_item_id = ?";
+        String sql = "UPDATE InvoiceItem SET invoice_id = ?, room_id = ?, service_id = ?, item_type = ?, quantity = ?, amount = ?, description = ? WHERE invoice_item_id = ?";
         return jdbcTemplate.update(sql,
                 item.invoiceId(),
+                item.roomId(),
+                item.serviceId(),
                 item.itemType(),
                 item.quantity(),
                 item.amount(),
+                item.description(),
                 item.invoiceItemId()
         );
     }

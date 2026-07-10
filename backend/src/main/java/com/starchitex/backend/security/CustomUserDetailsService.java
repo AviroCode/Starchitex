@@ -8,9 +8,11 @@ import com.starchitex.backend.repository.GuestCredentialsRepository;
 import com.starchitex.backend.repository.EmployeeRepository;
 import com.starchitex.backend.model.Employee;
 import com.starchitex.backend.repository.RolePermissionRepository;
+import com.starchitex.backend.repository.RoleRepository;
+import com.starchitex.backend.model.Role;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
+
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -28,12 +30,14 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final GuestCredentialsRepository guestRepo;
     private final EmployeeRepository employeeDataRepo;
     private final RolePermissionRepository rolePermissionRepo;
+    private final RoleRepository roleRepo;
 
-    public CustomUserDetailsService(EmployeeCredentialsRepository employeeRepo, GuestCredentialsRepository guestRepo, RolePermissionRepository rolePermissionRepo, EmployeeRepository employeeDataRepo) {
+    public CustomUserDetailsService(EmployeeCredentialsRepository employeeRepo, GuestCredentialsRepository guestRepo, RolePermissionRepository rolePermissionRepo, EmployeeRepository employeeDataRepo, RoleRepository roleRepo) {
         this.employeeRepo = employeeRepo;
         this.guestRepo = guestRepo;
         this.rolePermissionRepo = rolePermissionRepo;
         this.employeeDataRepo = employeeDataRepo;
+        this.roleRepo = roleRepo;
     }
 
     @Override
@@ -64,8 +68,15 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     private Collection<? extends GrantedAuthority> getAuthorities(int roleId) {
         List<Permission> permissions = rolePermissionRepo.findPermissionsByRoleId(roleId);
-        return permissions.stream()
+        List<GrantedAuthority> authorities = permissions.stream()
                 .map(p -> new SimpleGrantedAuthority(p.permissionName()))
                 .collect(Collectors.toList());
+        
+        Optional<Role> roleOpt = roleRepo.findById(roleId);
+        if (roleOpt.isPresent()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + roleOpt.get().roleName()));
+        }
+        
+        return authorities;
     }
 }

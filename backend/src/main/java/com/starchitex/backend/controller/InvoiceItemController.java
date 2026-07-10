@@ -49,9 +49,12 @@ public class InvoiceItemController {
         InvoiceItem itemToUpdate = new InvoiceItem(
                 invoiceItemId,
                 item.invoiceId(),
+                item.roomId(),
+                item.serviceId(),
                 item.itemType(),
                 item.quantity(),
-                item.amount()
+                item.amount(),
+                item.description()
         );
 
         boolean isUpdated = invoiceItemService.updateInvoiceItem(itemToUpdate);

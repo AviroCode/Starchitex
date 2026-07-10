@@ -18,11 +18,13 @@ public class EmployeeController {
         this.employeeService = employeeService;
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping
     public List<Employee> getAllEmployees() {
         return employeeService.getAllEmployees();
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping("/{id}")
     public ResponseEntity<Employee> getEmployeeById(@PathVariable int id) {
         return employeeService.getEmployeeById(id)
@@ -30,12 +32,13 @@ public class EmployeeController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or #branchId == authentication.principal.branchId")
     @GetMapping("/branch/{branchId}")
     public List<Employee> getEmployeesByBranchId(@PathVariable int branchId) {
         return employeeService.getEmployeesByBranchId(branchId);
     }
 
-    @PreAuthorize("hasAuthority('ADMIN') or #employee.branchId() == authentication.principal.branchId")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or #employee.branchId() == authentication.principal.branchId")
     @PostMapping
     public ResponseEntity<String> createEmployee(@RequestBody Employee employee) {
         boolean isCreated = employeeService.createEmployee(employee);
@@ -46,7 +49,7 @@ public class EmployeeController {
         }
     }
 
-    @PreAuthorize("hasAuthority('ADMIN') or #employee.branchId() == authentication.principal.branchId")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or #employee.branchId() == authentication.principal.branchId")
     @PutMapping("/{id}")
     public ResponseEntity<String> updateEmployee(@PathVariable int id, @RequestBody Employee employee) {
         Employee employeeToUpdate = new Employee(

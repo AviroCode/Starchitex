@@ -35,7 +35,21 @@ public class ReservationService {
         if (reservation.checkOutDate().isBefore(reservation.checkInDate()) || reservation.checkOutDate().isEqual(reservation.checkInDate())) {
             throw new IllegalArgumentException("Check-out must be strictly after check-in");
         }
-        return reservationRepository.save(reservation) > 0;
+        
+        Reservation forcedPending = new Reservation(
+            reservation.reservationId(),
+            reservation.branchId(),
+            reservation.guestId(),
+            reservation.checkInDate(),
+            reservation.checkOutDate(),
+            reservation.actualCheckinTime(),
+            reservation.actualCheckoutTime(),
+            reservation.bookingDate(),
+            reservation.numOfGuests(),
+            "Pending"
+        );
+        
+        return reservationRepository.save(forcedPending) > 0;
     }
 
     @Transactional

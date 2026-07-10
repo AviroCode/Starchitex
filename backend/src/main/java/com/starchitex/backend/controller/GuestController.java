@@ -4,6 +4,7 @@ import com.starchitex.backend.model.Guest;
 import com.starchitex.backend.service.GuestService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -17,11 +18,13 @@ public class GuestController {
         this.guestService = guestService;
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping
     public List<Guest> getAllGuests() {
         return guestService.getAllGuests();
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
     @GetMapping("/{id}")
     public ResponseEntity<Guest> getGuestById(@PathVariable int id) {
         return guestService.getGuestById(id)

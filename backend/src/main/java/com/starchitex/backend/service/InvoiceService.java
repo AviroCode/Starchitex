@@ -22,6 +22,10 @@ public class InvoiceService {
         return invoiceRepository.findAll();
     }
 
+    public Optional<Invoice> getInvoiceByIdForUpdate(int invoiceId) {
+        return invoiceRepository.findByIdForUpdate(invoiceId);
+    }
+
     public Optional<Invoice> getInvoiceById(int invoiceId) {
         return invoiceRepository.findById(invoiceId);
     }

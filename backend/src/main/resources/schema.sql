@@ -245,10 +245,20 @@ CREATE TABLE IF NOT EXISTS FacilityMaintenance (
 -- 5. Tables referencing Group 4
 CREATE TABLE IF NOT EXISTS InvoiceItem (
     invoice_item_id SERIAL PRIMARY KEY,
-    invoice_id INT NOT NULL REFERENCES Invoice(invoice_id) ON DELETE RESTRICT,
-    item_type VARCHAR(100) NOT NULL,
-    quantity INT NOT NULL,
-    amount DECIMAL(10, 2) NOT NULL
+    invoice_id  INT          NOT NULL REFERENCES Invoice(invoice_id)  ON DELETE RESTRICT,
+    room_id     INT                   REFERENCES Room(room_id),        -- set for Room / Damage / Maintenance charges
+    service_id  INT                   REFERENCES Service(service_id),  -- set for Service charges
+    item_type   VARCHAR(100) NOT NULL,
+    quantity    INT          NOT NULL DEFAULT 1,
+    amount      DECIMAL(10, 2) NOT NULL,
+    description TEXT,                                                  -- optional staff note (e.g. "broken TV")
+    CONSTRAINT chk_invoiceitem_type CHECK (
+        item_type IN ('Room', 'Service', 'Damage', 'Maintenance', 'Other')
+    ),
+    -- Exactly one of room_id / service_id must be set (or neither for 'Other')
+    CONSTRAINT chk_invoiceitem_refs CHECK (
+        NOT (room_id IS NOT NULL AND service_id IS NOT NULL)
+    )
 );
 
 CREATE TABLE IF NOT EXISTS Payment (
@@ -398,7 +408,11 @@ ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_guests CHECK (num_of_gues
 
 
 -- Ensure logical timestamps
-ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_times CHECK (actual_checkout_time IS NULL OR actual_checkin_time IS NULL OR actual_checkout_time >= actual_checkin_time);
+ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_times CHECK (
+    (actual_checkin_time IS NULL OR DATE(actual_checkin_time) >= check_in_date AND DATE(actual_checkin_time) <= check_out_date) AND
+    (actual_checkout_time IS NULL OR actual_checkin_time IS NULL OR actual_checkout_time >= actual_checkin_time) AND
+    (actual_checkout_time IS NULL OR DATE(actual_checkout_time) >= check_in_date AND DATE(actual_checkout_time) <= check_out_date)
+);
 ALTER TABLE RoomTask ADD CONSTRAINT chk_roomtask_times CHECK (completed_time IS NULL OR completed_time >= assigned_time);
 ALTER TABLE FacilityTask ADD CONSTRAINT chk_facilitytask_times CHECK (completed_time IS NULL OR completed_time >= assigned_time);
 
@@ -490,3 +504,92 @@ CHECK (status IN ('Reported', 'In Progress', 'Completed'));
 
 ALTER TABLE FacilityMaintenance ADD CONSTRAINT chk_facility_maintenance_status 
 CHECK (status IN ('Reported', 'In Progress', 'Completed'));
+
+
+-- Trigger: auto-fill amount from RoomType.base_price or Service.price
+-- 'Damage', 'Maintenance', 'Other' amounts are left untouched (staff-entered).
+CREATE OR REPLACE FUNCTION enforce_invoice_item_price()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_unit_price DECIMAL(10, 2);
+BEGIN
+    IF NEW.item_type = 'Room' THEN
+        -- Requires room_id to be set
+        IF NEW.room_id IS NULL THEN
+            RAISE EXCEPTION 'InvoiceItem of type Room must have room_id set';
+        END IF;
+
+        -- Look up this specific room\'s base_price
+        SELECT rt.base_price INTO v_unit_price
+        FROM Room r
+        JOIN RoomType rt ON r.room_type_id = rt.room_type_id
+        WHERE r.room_id = NEW.room_id;
+
+        IF v_unit_price IS NOT NULL THEN
+            NEW.amount := v_unit_price * NEW.quantity;
+        END IF;
+
+    ELSIF NEW.item_type = 'Service' THEN
+        -- Requires service_id to be set
+        IF NEW.service_id IS NULL THEN
+            RAISE EXCEPTION 'InvoiceItem of type Service must have service_id set';
+        END IF;
+
+        -- Look up the service price
+        SELECT price INTO v_unit_price
+        FROM Service
+        WHERE service_id = NEW.service_id;
+
+        IF v_unit_price IS NOT NULL THEN
+            NEW.amount := v_unit_price * NEW.quantity;
+        END IF;
+
+    -- 'Damage', 'Maintenance', 'Other': amount stays as provided by staff
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_invoice_item_price ON InvoiceItem;
+CREATE TRIGGER trg_enforce_invoice_item_price
+BEFORE INSERT OR UPDATE ON InvoiceItem
+FOR EACH ROW EXECUTE FUNCTION enforce_invoice_item_price();
+
+-- Trigger to sync RoomAvailability
+CREATE OR REPLACE FUNCTION sync_room_availability()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_checkin DATE;
+    v_checkout DATE;
+    curr_date DATE;
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        SELECT check_in_date, check_out_date INTO v_checkin, v_checkout FROM Reservation WHERE reservation_id = NEW.reservation_id;
+        curr_date := v_checkin;
+        WHILE curr_date < v_checkout LOOP
+            INSERT INTO RoomAvailability (room_id, calendar_date, status, reservation_id)
+            VALUES (NEW.room_id, curr_date, 'Occupied', NEW.reservation_id)
+            ON CONFLICT (room_id, calendar_date) 
+            DO UPDATE SET status = 'Occupied', reservation_id = NEW.reservation_id;
+            curr_date := curr_date + 1;
+        END LOOP;
+        RETURN NEW;
+    ELSIF (TG_OP = 'DELETE') THEN
+        SELECT check_in_date, check_out_date INTO v_checkin, v_checkout FROM Reservation WHERE reservation_id = OLD.reservation_id;
+        curr_date := v_checkin;
+        WHILE curr_date < v_checkout LOOP
+            UPDATE RoomAvailability SET status = 'Available', reservation_id = NULL
+            WHERE room_id = OLD.room_id AND calendar_date = curr_date;
+            curr_date := curr_date + 1;
+        END LOOP;
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sync_room_availability ON ReservationRoom;
+CREATE TRIGGER trg_sync_room_availability
+AFTER INSERT OR DELETE ON ReservationRoom
+FOR EACH ROW EXECUTE FUNCTION sync_room_availability();

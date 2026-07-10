@@ -35,6 +35,12 @@ public class InvoiceRepository {
         return jdbcTemplate.query(sql, invoiceRowMapper);
     }
 
+    public Optional<Invoice> findByIdForUpdate(int invoiceId) {
+        String sql = "SELECT * FROM Invoice WHERE invoice_id = ? FOR UPDATE";
+        List<Invoice> invoices = jdbcTemplate.query(sql, invoiceRowMapper, invoiceId);
+        return invoices.isEmpty() ? Optional.empty() : Optional.of(invoices.get(0));
+    }
+
     public Optional<Invoice> findById(int invoiceId) {
         String sql = "SELECT * FROM Invoice WHERE invoice_id = ?";
         List<Invoice> invoices = jdbcTemplate.query(sql, invoiceRowMapper, invoiceId);

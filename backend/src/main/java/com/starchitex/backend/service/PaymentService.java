@@ -35,13 +35,13 @@ public class PaymentService {
 
     @Transactional
     public boolean createPayment(Payment payment) {
-        Invoice invoice = invoiceService.getInvoiceById(payment.invoiceId())
+        Invoice invoice = invoiceService.getInvoiceByIdForUpdate(payment.invoiceId())
                 .orElseThrow(() -> new IllegalArgumentException("Invoice not found"));
 
         List<Payment> existingPayments = paymentRepository.findByInvoiceId(invoice.invoiceId());
         BigDecimal currentPaid = existingPayments.stream()
-                .map(Payment::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map(p -> p.amount())
+                .reduce(BigDecimal.ZERO, (a, b) -> a.add(b));
 
         BigDecimal newTotalPaid = currentPaid.add(payment.amount());
 
