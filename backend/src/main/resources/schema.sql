@@ -593,3 +593,49 @@ DROP TRIGGER IF EXISTS trg_sync_room_availability ON ReservationRoom;
 CREATE TRIGGER trg_sync_room_availability
 AFTER INSERT OR DELETE ON ReservationRoom
 FOR EACH ROW EXECUTE FUNCTION sync_room_availability();
+
+-- -----------------------------------------------------------------------
+-- Trigger: prevent_overpayment
+-- Fires BEFORE INSERT on Payment.
+-- Sums all existing payments for the same invoice and rejects the new row
+-- if it would cause the total paid to exceed Invoice.total_amount.
+-- This protects the rule against every writer (API, psql, future services).
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION prevent_overpayment()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_total_amount   DECIMAL(10, 2);
+    v_already_paid   DECIMAL(10, 2);
+    v_outstanding    DECIMAL(10, 2);
+BEGIN
+    -- Lock the invoice row to serialise concurrent payment inserts
+    SELECT total_amount INTO v_total_amount
+    FROM Invoice
+    WHERE invoice_id = NEW.invoice_id
+    FOR UPDATE;
+
+    IF v_total_amount IS NULL THEN
+        RAISE EXCEPTION 'Invoice % not found', NEW.invoice_id;
+    END IF;
+
+    SELECT COALESCE(SUM(amount), 0) INTO v_already_paid
+    FROM Payment
+    WHERE invoice_id = NEW.invoice_id;
+
+    v_outstanding := v_total_amount - v_already_paid;
+
+    IF NEW.amount > v_outstanding THEN
+        RAISE EXCEPTION
+            'Overpayment rejected: invoice % outstanding is %, but payment amount is %',
+            NEW.invoice_id, v_outstanding, NEW.amount
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prevent_overpayment ON Payment;
+CREATE TRIGGER trg_prevent_overpayment
+BEFORE INSERT ON Payment
+FOR EACH ROW EXECUTE FUNCTION prevent_overpayment();

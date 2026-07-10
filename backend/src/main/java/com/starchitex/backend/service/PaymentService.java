@@ -35,31 +35,28 @@ public class PaymentService {
 
     @Transactional
     public boolean createPayment(Payment payment) {
-        Invoice invoice = invoiceService.getInvoiceByIdForUpdate(payment.invoiceId())
-                .orElseThrow(() -> new IllegalArgumentException("Invoice not found"));
-
-        List<Payment> existingPayments = paymentRepository.findByInvoiceId(invoice.invoiceId());
-        BigDecimal currentPaid = existingPayments.stream()
-                .map(p -> p.amount())
-                .reduce(BigDecimal.ZERO, (a, b) -> a.add(b));
-
-        BigDecimal newTotalPaid = currentPaid.add(payment.amount());
-
-        if (newTotalPaid.compareTo(invoice.totalAmount()) > 0) {
-            throw new IllegalArgumentException("Payment exceeds total invoice amount. Outstanding: " + invoice.totalAmount().subtract(currentPaid));
-        }
-
+        // Overpayment is enforced by trg_prevent_overpayment (BEFORE INSERT on Payment).
+        // If it triggers, an exception propagates here and rolls back the transaction.
         boolean saved = paymentRepository.save(payment) > 0;
 
         if (saved) {
-            String newStatus = newTotalPaid.compareTo(invoice.totalAmount()) == 0 ? "Paid" : "Partially Paid";
+            // Update invoice status to Paid or Partially Paid based on totals
+            Invoice invoice = invoiceService.getInvoiceById(payment.invoiceId())
+                    .orElseThrow(() -> new IllegalArgumentException("Invoice not found"));
+
+            List<Payment> allPayments = paymentRepository.findByInvoiceId(payment.invoiceId());
+            BigDecimal totalPaid = allPayments.stream()
+                    .map(p -> p.amount())
+                    .reduce(BigDecimal.ZERO, (a, b) -> a.add(b));
+
+            String newStatus = totalPaid.compareTo(invoice.totalAmount()) >= 0 ? "Paid" : "Partially Paid";
             if (!invoice.status().equals(newStatus)) {
-                Invoice updatedInvoice = new Invoice(
+                Invoice updated = new Invoice(
                     invoice.invoiceId(), invoice.reservationId(), invoice.payerGuestId(),
                     invoice.invoiceDate(), invoice.subTotal(), invoice.taxAmount(),
                     invoice.discount(), invoice.totalAmount(), newStatus
                 );
-                invoiceService.updateInvoice(updatedInvoice);
+                invoiceService.updateInvoice(updated);
             }
         }
         return saved;
