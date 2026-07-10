@@ -250,3 +250,10 @@ The logic for recalculating invoice totals (`sub_total`, `tax_amount`, `total_am
 
 - **New trigger `trg_recalculate_invoice_total_on_item_change` (AFTER INSERT OR UPDATE OR DELETE ON `InvoiceItem`)**: This trigger automatically invokes the existing `calculate_invoice_total(invoice_id)` stored procedure whenever an invoice item is mutated.
 - **`InvoiceItemService` simplification**: The manual wiring of `InvoiceService` and explicit calls to `recalculateInvoice()` have been removed from the Java layer. The database now natively guarantees that an invoice's totals stay perfectly synchronized with its underlying line items without requiring app-level coordination.
+
+## DB-First Refactor — Reservation State Machine Trigger (Phase 8)
+
+The reservation status state machine logic has been completely migrated from the Java layer into the database layer:
+
+- **New trigger `trg_enforce_reservation_state_machine` (BEFORE UPDATE ON `Reservation`)**: This trigger acts as a strict state machine validator. It inspects `OLD.status` and `NEW.status` and raises a `check_violation` exception for any illegal transitions. The allowed paths are strictly enforced (`Pending` → `Confirmed` → `Checked In` → `Checked Out`). Cancelled and Checked Out are enforced as terminal states.
+- **`ReservationService` simplification**: All four transition methods (`confirm`, `checkIn`, `checkOut`, `cancel`) have had their ad-hoc `if (!res.status().equals(...))` guard clauses removed. The Java layer simply attempts the status update and relies on the PostgreSQL trigger to block illegal state transitions.

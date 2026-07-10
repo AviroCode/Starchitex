@@ -59,9 +59,6 @@ public class ReservationService {
     public boolean confirm(int reservationId) {
         Reservation res = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
-        if (!res.status().equals("Pending")) {
-            throw new IllegalStateException("Only Pending reservations can be confirmed.");
-        }
         Reservation updated = new Reservation(
             res.reservationId(), res.branchId(), res.guestId(), res.checkInDate(), res.checkOutDate(),
             res.actualCheckinTime(), res.actualCheckoutTime(), res.bookingDate(), res.numOfGuests(), "Confirmed"
@@ -73,9 +70,6 @@ public class ReservationService {
     public boolean checkIn(int reservationId) {
         Reservation res = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
-        if (!res.status().equals("Confirmed")) {
-            throw new IllegalStateException("Only Confirmed reservations can be checked in.");
-        }
         Reservation updated = new Reservation(
             res.reservationId(), res.branchId(), res.guestId(), res.checkInDate(), res.checkOutDate(),
             LocalDateTime.now(), res.actualCheckoutTime(), res.bookingDate(), res.numOfGuests(), "Checked In"
@@ -87,9 +81,6 @@ public class ReservationService {
     public boolean checkOut(int reservationId) {
         Reservation res = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
-        if (!res.status().equals("Checked In")) {
-            throw new IllegalStateException("Only Checked In reservations can be checked out.");
-        }
         Reservation updated = new Reservation(
             res.reservationId(), res.branchId(), res.guestId(), res.checkInDate(), res.checkOutDate(),
             res.actualCheckinTime(), LocalDateTime.now(), res.bookingDate(), res.numOfGuests(), "Checked Out"
@@ -101,9 +92,6 @@ public class ReservationService {
     public boolean cancel(int reservationId) {
         Reservation res = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
-        if (res.status().equals("Checked In") || res.status().equals("Checked Out")) {
-            throw new IllegalStateException("Cannot cancel a reservation that has already started.");
-        }
         Reservation updated = new Reservation(
             res.reservationId(), res.branchId(), res.guestId(), res.checkInDate(), res.checkOutDate(),
             res.actualCheckinTime(), res.actualCheckoutTime(), res.bookingDate(), res.numOfGuests(), "Cancelled"

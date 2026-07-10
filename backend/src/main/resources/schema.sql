@@ -723,4 +723,43 @@ CREATE TRIGGER trg_recalculate_invoice_total_on_item_change
 AFTER INSERT OR UPDATE OR DELETE ON InvoiceItem
 FOR EACH ROW EXECUTE FUNCTION trigger_recalculate_invoice_total();
 
+-- -----------------------------------------------------------------------
+-- Trigger: enforce_reservation_state_machine
+-- Fires BEFORE UPDATE ON Reservation.
+-- Enforces allowed transitions for the reservation status state machine.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION enforce_reservation_state_machine()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- If status is not changing, allow the update
+    IF NEW.status = OLD.status THEN
+        RETURN NEW;
+    END IF;
+
+    -- Allowed state transitions:
+    -- Pending -> Confirmed, Cancelled
+    -- Confirmed -> Checked In, Cancelled
+    -- Checked In -> Checked Out
+    -- Cancelled / Checked Out -> (Terminal states, no transitions allowed)
+    
+    IF OLD.status = 'Pending' AND NEW.status NOT IN ('Confirmed', 'Cancelled') THEN
+        RAISE EXCEPTION 'Invalid transition: Cannot move from % to %', OLD.status, NEW.status USING ERRCODE = 'check_violation';
+    ELSIF OLD.status = 'Confirmed' AND NEW.status NOT IN ('Checked In', 'Cancelled') THEN
+        RAISE EXCEPTION 'Invalid transition: Cannot move from % to %', OLD.status, NEW.status USING ERRCODE = 'check_violation';
+    ELSIF OLD.status = 'Checked In' AND NEW.status NOT IN ('Checked Out') THEN
+        RAISE EXCEPTION 'Invalid transition: Cannot move from % to %', OLD.status, NEW.status USING ERRCODE = 'check_violation';
+    ELSIF OLD.status IN ('Checked Out', 'Cancelled') THEN
+        RAISE EXCEPTION 'Invalid transition: % is a terminal state, cannot move to %', OLD.status, NEW.status USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_reservation_state_machine ON Reservation;
+CREATE TRIGGER trg_enforce_reservation_state_machine
+BEFORE UPDATE ON Reservation
+FOR EACH ROW EXECUTE FUNCTION enforce_reservation_state_machine();
+
+
 
