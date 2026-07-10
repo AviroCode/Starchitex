@@ -761,6 +761,26 @@ CREATE TRIGGER trg_enforce_reservation_state_machine
 BEFORE UPDATE ON Reservation
 FOR EACH ROW EXECUTE FUNCTION enforce_reservation_state_machine();
 
+-- -----------------------------------------------------------------------
+-- Trigger: cleanup_on_reservation_cancel
+-- Fires AFTER UPDATE ON Reservation.
+-- Automatically deletes associated ReservationRoom records when a reservation
+-- is cancelled. This cascades to trg_sync_room_availability to free the rooms.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION cleanup_reservation_rooms_on_cancel()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status = 'Cancelled' AND OLD.status != 'Cancelled' THEN
+        DELETE FROM ReservationRoom WHERE reservation_id = NEW.reservation_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_cleanup_on_reservation_cancel ON Reservation;
+CREATE TRIGGER trg_cleanup_on_reservation_cancel
+AFTER UPDATE ON Reservation
+FOR EACH ROW EXECUTE FUNCTION cleanup_reservation_rooms_on_cancel();
 
 
 -- ====================================================================================

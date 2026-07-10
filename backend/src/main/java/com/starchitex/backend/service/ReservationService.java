@@ -96,13 +96,6 @@ public class ReservationService {
             res.reservationId(), res.branchId(), res.guestId(), res.checkInDate(), res.checkOutDate(),
             res.actualCheckinTime(), res.actualCheckoutTime(), res.bookingDate(), res.numOfGuests(), "Cancelled"
         );
-        boolean cancelled = reservationRepository.update(updated) > 0;
-
-        // Bug 4 fix: delete all room assignments so the sync_room_availability trigger
-        // fires and restores RoomAvailability rows back to 'Available'.
-        if (cancelled) {
-            reservationRoomRepository.deleteByReservationId(reservationId);
-        }
-        return cancelled;
+        return reservationRepository.update(updated) > 0;
     }
 }

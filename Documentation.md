@@ -271,3 +271,10 @@ The most significant architectural shift to a database-first model: moving multi
   - Intercepts `Connection.close()` to issue `RESET` commands, securely scrubbing the tenant context before the connection is returned to the Hikari pool to prevent cross-contamination.
 - **Controller `@PreAuthorize` Cleanup**:
   - With PostgreSQL enforcing isolation universally at the lowest level, all redundant SpEL checks (e.g., `#branchId == authentication.principal.branchId`) have been removed from `RoomController`, `ReservationController`, `EmployeeController`, and `ReservationRoomController`.
+
+## DB-First Refactor — Cancel-Time Cleanup Trigger (Phase 10)
+
+The logic for cleaning up assigned rooms when a reservation is cancelled has been moved from the Java layer to a database trigger.
+
+- **New trigger `trg_cleanup_on_reservation_cancel` (AFTER UPDATE ON `Reservation`)**: This trigger fires when a reservation status changes to `Cancelled`. It automatically deletes the associated `ReservationRoom` records. This deletion then natively cascades to the pre-existing `trg_sync_room_availability` trigger, which correctly frees up the `RoomAvailability` calendar slots.
+- **`ReservationService` Simplification**: The explicit call to `reservationRoomRepository.deleteByReservationId(reservationId)` inside the `cancel()` method has been removed. The database is now entirely responsible for ensuring that cancelled reservations don't hold onto rooms, regardless of whether the cancellation comes from the API or a direct SQL script.
