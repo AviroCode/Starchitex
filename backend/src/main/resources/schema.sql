@@ -299,6 +299,76 @@ AFTER UPDATE OR DELETE ON Reservation
 FOR EACH ROW
 EXECUTE FUNCTION log_reservation_audit();
 
+-- -----------------------------------------------------------------------
+-- Extended Audit Logging (Invoice, Payment, ServiceRequest)
+-- -----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION log_invoice_audit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'DELETE') THEN
+        INSERT INTO AuditLog(action, table_name, pk_of_table, old_value)
+        VALUES ('DELETE', 'Invoice', OLD.invoice_id::VARCHAR, 'Total: ' || OLD.total_amount || ', Status: ' || OLD.status);
+        RETURN OLD;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        IF (OLD.status <> NEW.status) THEN
+            INSERT INTO AuditLog(action, table_name, pk_of_table, affected_col, old_value, new_value)
+            VALUES ('UPDATE_STATUS', 'Invoice', OLD.invoice_id::VARCHAR, 'status', OLD.status, NEW.status);
+        END IF;
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_invoice_audit ON Invoice;
+CREATE TRIGGER trg_invoice_audit
+AFTER UPDATE OR DELETE ON Invoice
+FOR EACH ROW EXECUTE FUNCTION log_invoice_audit();
+
+
+CREATE OR REPLACE FUNCTION log_payment_audit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'DELETE') THEN
+        INSERT INTO AuditLog(action, table_name, pk_of_table, old_value)
+        VALUES ('DELETE', 'Payment', OLD.payment_id::VARCHAR, 'Amount: ' || OLD.amount_paid || ', Method: ' || OLD.payment_method);
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_payment_audit ON Payment;
+CREATE TRIGGER trg_payment_audit
+AFTER DELETE ON Payment
+FOR EACH ROW EXECUTE FUNCTION log_payment_audit();
+
+
+CREATE OR REPLACE FUNCTION log_service_request_audit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'DELETE') THEN
+        INSERT INTO AuditLog(action, table_name, pk_of_table, old_value)
+        VALUES ('DELETE', 'ServiceRequest', OLD.request_id::VARCHAR, 'Service: ' || OLD.service_id || ', Status: ' || OLD.status);
+        RETURN OLD;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        IF (OLD.status <> NEW.status AND NEW.status = 'Cancelled') THEN
+            INSERT INTO AuditLog(action, table_name, pk_of_table, affected_col, old_value, new_value)
+            VALUES ('UPDATE_CANCEL', 'ServiceRequest', OLD.request_id::VARCHAR, 'status', OLD.status, NEW.status);
+        END IF;
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_service_request_audit ON ServiceRequest;
+CREATE TRIGGER trg_service_request_audit
+AFTER UPDATE OR DELETE ON ServiceRequest
+FOR EACH ROW EXECUTE FUNCTION log_service_request_audit();
+
+
 
 -- Trigger to prevent double booking of rooms
 CREATE OR REPLACE FUNCTION prevent_double_booking()
@@ -921,3 +991,33 @@ CREATE POLICY facility_maintenance_isolation ON FacilityMaintenance FOR ALL USIN
 CREATE POLICY facility_booking_isolation ON FacilityBooking FOR ALL USING (
     is_super_admin() OR branch_id = current_branch_id()
 );
+
+-- ====================================================================================
+-- 11. Stored Procedures (Data Management & GDPR)
+-- ====================================================================================
+
+-- Stored Procedure: anonymize_guest(guest_id)
+-- Nullifies PII for a given guest while preserving financial and audit history.
+-- Also removes associated GuestCredentials to prevent future logins.
+CREATE OR REPLACE PROCEDURE anonymize_guest(p_guest_id INT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- 1. Delete credentials to revoke access immediately
+    DELETE FROM GuestCredentials WHERE guest_id = p_guest_id;
+    
+    -- 2. Nullify PII in Guest table. 
+    -- 'first_name' and 'last_name' are NOT NULL in schema, so we replace them with a generic string.
+    UPDATE Guest 
+    SET first_name = 'Anonymized',
+        last_name = 'Guest',
+        gender = NULL,
+        date_of_birth = NULL,
+        nationality = NULL,
+        passport_number = NULL,
+        phone_number = NULL,
+        email = 'anonymized_' || guest_id || '@deleted.local',
+        address = NULL
+    WHERE guest_id = p_guest_id;
+END;
+$$;

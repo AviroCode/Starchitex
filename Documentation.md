@@ -278,3 +278,17 @@ The logic for cleaning up assigned rooms when a reservation is cancelled has bee
 
 - **New trigger `trg_cleanup_on_reservation_cancel` (AFTER UPDATE ON `Reservation`)**: This trigger fires when a reservation status changes to `Cancelled`. It automatically deletes the associated `ReservationRoom` records. This deletion then natively cascades to the pre-existing `trg_sync_room_availability` trigger, which correctly frees up the `RoomAvailability` calendar slots.
 - **`ReservationService` Simplification**: The explicit call to `reservationRoomRepository.deleteByReservationId(reservationId)` inside the `cancel()` method has been removed. The database is now entirely responsible for ensuring that cancelled reservations don't hold onto rooms, regardless of whether the cancellation comes from the API or a direct SQL script.
+
+## DB-First Refactor — Guest Anonymization & Extended Audit Logging (Phase 11)
+
+To support GDPR requirements and broaden the system's observability directly at the data layer, we added stored procedures and extended the audit triggers.
+
+- **Guest Anonymization (GDPR)**:
+  - Added the stored procedure `anonymize_guest(guest_id)`.
+  - Instead of performing a hard `DELETE` (which violates foreign key constraints on `Reservation` and financial history), this procedure nullifies all Personally Identifiable Information (PII) on the `Guest` record.
+  - It automatically revokes access by deleting the associated `GuestCredentials`.
+- **Extended Audit Logging**:
+  - `trg_invoice_audit`: Logs updates to `Invoice` statuses and deletions.
+  - `trg_payment_audit`: Logs deletions of `Payment` records (since payments are immutable, there is no update trigger).
+  - `trg_service_request_audit`: Logs cancellations and deletions of `ServiceRequest` records.
+  - This ensures comprehensive, un-bypassable auditing for the core financial and operational entities, directly to the `AuditLog` table.
