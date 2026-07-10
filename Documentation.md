@@ -229,3 +229,10 @@ Following an in-depth code audit, five confirmed bugs were identified and resolv
 4. **`Pending → Confirmed` Transition Added**: Added `confirm()` in `ReservationService` and `POST /api/reservations/{id}/confirm` endpoint. The full state machine is now `Pending → Confirmed → Checked In → Checked Out`. Check-in is no longer unreachable.
 5. **`cancel()` Now Cleans Up `RoomAvailability`**: `ReservationService.cancel()` calls `reservationRoomRepository.deleteByReservationId()` after status update. This fires `trg_sync_room_availability` on each deleted `ReservationRoom` row, restoring those dates to `'Available'` automatically.
 6. **Canonical Role Seed Data Committed**: Created `database/seed/data.sql` with 10 exact `Role` INSERT statements. These are the single source of truth for role name strings used in all Java `@PreAuthorize` expressions.
+
+## DB-First Refactor — Overpayment Trigger (Phase 5)
+
+Per the project's database-first architecture principle, the overpayment/underpayment rejection rule has been moved from Java (`PaymentService`) into the database layer:
+
+- **New trigger `trg_prevent_overpayment` (BEFORE INSERT on `Payment`)**: The function `prevent_overpayment()` acquires a `SELECT ... FOR UPDATE` lock on the target `Invoice` row, sums all existing payments for that invoice, and raises a `check_violation` exception if the new payment would cause the running total to exceed `Invoice.total_amount`. This rule now applies to every writer — the API, a direct `psql` script, or any future service — not just the single Java code path.
+- **`PaymentService` simplified**: The redundant Java sum/compare guard and the `getInvoiceByIdForUpdate` row-lock call have been removed. `createPayment` now simply calls `paymentRepository.save()` and lets the trigger enforce the constraint. Invoice status (`Paid` / `Partially Paid`) is still updated in Java after a successful insert, as that remains appropriate app-level logic.
