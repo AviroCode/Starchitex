@@ -218,3 +218,14 @@ To resolve remaining data-integrity gaps and resolve vulnerabilities found in th
 7. **Pessimistic Locking**: Wrapped payment processes with a `FOR UPDATE` query lock inside `InvoiceRepository` (`findByIdForUpdate`) to lock invoice records and protect against concurrent payment race conditions.
 8. **Removed Invoice PUT Bypass**: Deleted the arbitrary `PUT /api/invoices/{id}` method to enforce payments as the sole mechanism for updating invoice statuses.
 
+
+## Backend Bug Fixes — Phase 4 (Post-Audit)
+
+Following an in-depth code audit, five confirmed bugs were identified and resolved:
+
+1. **RBAC Over-Restriction Fixed**: By-ID endpoints (`getEmployeeById`, `getRoomById`, `getReservationById`, `getGuestById`) were incorrectly restricted to senior roles only. They now accept any authenticated branch employee as a fallback. `GET /api/reservations/guest/{guestId}` now also allows a Guest to read their own reservation history. `getAllGuests` intentionally remains senior-role only.
+2. **Guest Self-Service via `guestId` Claim**: Added `guestId` field to `CustomUserDetails`. `CustomUserDetailsService` now populates this for guest logins (null for employees), enabling `authentication.principal.guestId` in SpEL expressions.
+3. **`calculate_invoice_total()` Now Reachable**: Injected `InvoiceService` into `InvoiceItemService`. Every `createInvoiceItem`, `updateInvoiceItem`, and `deleteInvoiceItem` now calls `invoiceService.recalculateInvoice(invoiceId)`, making the DB stored procedure live through the API.
+4. **`Pending → Confirmed` Transition Added**: Added `confirm()` in `ReservationService` and `POST /api/reservations/{id}/confirm` endpoint. The full state machine is now `Pending → Confirmed → Checked In → Checked Out`. Check-in is no longer unreachable.
+5. **`cancel()` Now Cleans Up `RoomAvailability`**: `ReservationService.cancel()` calls `reservationRoomRepository.deleteByReservationId()` after status update. This fires `trg_sync_room_availability` on each deleted `ReservationRoom` row, restoring those dates to `'Available'` automatically.
+6. **Canonical Role Seed Data Committed**: Created `database/seed/data.sql` with 10 exact `Role` INSERT statements. These are the single source of truth for role name strings used in all Java `@PreAuthorize` expressions.
