@@ -4,6 +4,8 @@ import com.starchitex.backend.model.EmployeeCredentials;
 import com.starchitex.backend.model.GuestCredentials;
 import com.starchitex.backend.repository.EmployeeCredentialsRepository;
 import com.starchitex.backend.repository.GuestCredentialsRepository;
+import com.starchitex.backend.repository.EmployeeRepository;
+import com.starchitex.backend.model.Employee;
 import com.starchitex.backend.security.JwtUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,12 +23,14 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final EmployeeCredentialsRepository employeeRepo;
     private final GuestCredentialsRepository guestRepo;
+    private final EmployeeRepository employeeDataRepo;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, EmployeeCredentialsRepository employeeRepo, GuestCredentialsRepository guestRepo) {
+    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, EmployeeCredentialsRepository employeeRepo, GuestCredentialsRepository guestRepo, EmployeeRepository employeeDataRepo) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.employeeRepo = employeeRepo;
         this.guestRepo = guestRepo;
+        this.employeeDataRepo = employeeDataRepo;
     }
 
     @PostMapping("/login")
@@ -38,10 +42,15 @@ public class AuthController {
 
             // Fetch the user's roleId from the DB to embed in the token
             int roleId = -1;
+            Integer branchId = null;
             
             Optional<EmployeeCredentials> empOpt = employeeRepo.findByUsername(request.username());
             if (empOpt.isPresent()) {
                 roleId = empOpt.get().roleId();
+                Optional<Employee> emp = employeeDataRepo.findById(empOpt.get().employeeId());
+                if (emp.isPresent()) {
+                    branchId = emp.get().branchId();
+                }
             } else {
                 Optional<GuestCredentials> guestOpt = guestRepo.findByUsername(request.username());
                 if (guestOpt.isPresent()) {
@@ -50,7 +59,7 @@ public class AuthController {
             }
 
             // Generate JWT
-            String token = jwtUtil.generateToken(request.username(), roleId);
+            String token = jwtUtil.generateToken(request.username(), roleId, branchId);
             return ResponseEntity.ok(token);
 
         } catch (Exception e) {

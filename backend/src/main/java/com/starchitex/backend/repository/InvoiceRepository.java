@@ -80,6 +80,11 @@ public class InvoiceRepository {
         );
     }
 
+    public void recalculateInvoiceTotal(int invoiceId) {
+        String sql = "SELECT calculate_invoice_total(?)";
+        jdbcTemplate.queryForObject(sql, java.math.BigDecimal.class, invoiceId);
+    }
+
     private final RowMapper<com.starchitex.backend.model.MonthlyRevenueDTO> monthlyRevenueRowMapper = (rs, rowNum) -> new com.starchitex.backend.model.MonthlyRevenueDTO(
             rs.getInt("invoice_year"),
             rs.getInt("invoice_month"),

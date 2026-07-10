@@ -44,6 +44,11 @@ public class InvoiceService {
         return invoiceRepository.update(invoice) > 0;
     }
 
+    @Transactional
+    public void recalculateInvoice(int invoiceId) {
+        invoiceRepository.recalculateInvoiceTotal(invoiceId);
+    }
+
     // Spring Boot Scheduler: Runs automatically every night at 2:00 AM
     @Scheduled(cron = "0 0 2 * * ?")
     public void refreshAnalyticsCache() {

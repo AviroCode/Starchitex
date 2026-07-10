@@ -5,6 +5,8 @@ import com.starchitex.backend.model.GuestCredentials;
 import com.starchitex.backend.model.Permission;
 import com.starchitex.backend.repository.EmployeeCredentialsRepository;
 import com.starchitex.backend.repository.GuestCredentialsRepository;
+import com.starchitex.backend.repository.EmployeeRepository;
+import com.starchitex.backend.model.Employee;
 import com.starchitex.backend.repository.RolePermissionRepository;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -24,12 +26,14 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     private final EmployeeCredentialsRepository employeeRepo;
     private final GuestCredentialsRepository guestRepo;
+    private final EmployeeRepository employeeDataRepo;
     private final RolePermissionRepository rolePermissionRepo;
 
-    public CustomUserDetailsService(EmployeeCredentialsRepository employeeRepo, GuestCredentialsRepository guestRepo, RolePermissionRepository rolePermissionRepo) {
+    public CustomUserDetailsService(EmployeeCredentialsRepository employeeRepo, GuestCredentialsRepository guestRepo, RolePermissionRepository rolePermissionRepo, EmployeeRepository employeeDataRepo) {
         this.employeeRepo = employeeRepo;
         this.guestRepo = guestRepo;
         this.rolePermissionRepo = rolePermissionRepo;
+        this.employeeDataRepo = employeeDataRepo;
     }
 
     @Override
@@ -38,15 +42,22 @@ public class CustomUserDetailsService implements UserDetailsService {
         Optional<EmployeeCredentials> employeeOpt = employeeRepo.findByUsername(username);
         if (employeeOpt.isPresent()) {
             EmployeeCredentials emp = employeeOpt.get();
-            return new User(emp.username(), emp.passwordHash(), getAuthorities(emp.roleId()));
+            Integer branchId = null;
+            Optional<Employee> empData = employeeDataRepo.findById(emp.employeeId());
+            if (empData.isPresent()) {
+                branchId = empData.get().branchId();
+            }
+            return new CustomUserDetails(emp.username(), emp.passwordHash(), getAuthorities(emp.roleId()), branchId);
         }
 
         // 2. If no employee, try finding a guest
         Optional<GuestCredentials> guestOpt = guestRepo.findByUsername(username);
         if (guestOpt.isPresent()) {
             GuestCredentials guest = guestOpt.get();
-            return new User(guest.username(), guest.passwordHash(), getAuthorities(guest.roleId()));
+            return new CustomUserDetails(guest.username(), guest.passwordHash(), getAuthorities(guest.roleId()), null);
         }
+
+
 
         throw new UsernameNotFoundException("User not found with username: " + username);
     }

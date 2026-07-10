@@ -4,6 +4,7 @@ import com.starchitex.backend.model.Reservation;
 import com.starchitex.backend.service.ReservationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class ReservationController {
         return reservationService.getReservationsByGuestId(guestId);
     }
 
+    @PreAuthorize("hasAuthority('ADMIN') or #reservation.branchId() == authentication.principal.branchId")
     @PostMapping
     public ResponseEntity<String> createReservation(@RequestBody Reservation reservation) {
         boolean isCreated = reservationService.createReservation(reservation);
@@ -44,26 +46,33 @@ public class ReservationController {
         }
     }
 
-    @PutMapping("/{reservationId}")
-    public ResponseEntity<String> updateReservation(@PathVariable int reservationId, @RequestBody Reservation reservation) {
-        Reservation reservationToUpdate = new Reservation(
-                reservationId,
-                reservation.branchId(),
-                reservation.guestId(),
-                reservation.checkInDate(),
-                reservation.checkOutDate(),
-                reservation.actualCheckinTime(),
-                reservation.actualCheckoutTime(),
-                reservation.bookingDate(),
-                reservation.numOfGuests(),
-                reservation.status()
-        );
+    @PostMapping("/{reservationId}/check-in")
+    public ResponseEntity<String> checkIn(@PathVariable int reservationId) {
+        try {
+            boolean success = reservationService.checkIn(reservationId);
+            return success ? ResponseEntity.ok("Checked in successfully!") : ResponseEntity.badRequest().body("Check-in failed.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 
-        boolean isUpdated = reservationService.updateReservation(reservationToUpdate);
-        if (isUpdated) {
-            return ResponseEntity.ok("Reservation updated successfully!");
-        } else {
-            return ResponseEntity.status(400).body("Failed to update reservation. Check if ID exists.");
+    @PostMapping("/{reservationId}/check-out")
+    public ResponseEntity<String> checkOut(@PathVariable int reservationId) {
+        try {
+            boolean success = reservationService.checkOut(reservationId);
+            return success ? ResponseEntity.ok("Checked out successfully!") : ResponseEntity.badRequest().body("Check-out failed.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{reservationId}/cancel")
+    public ResponseEntity<String> cancel(@PathVariable int reservationId) {
+        try {
+            boolean success = reservationService.cancel(reservationId);
+            return success ? ResponseEntity.ok("Cancelled successfully!") : ResponseEntity.badRequest().body("Cancellation failed.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 }

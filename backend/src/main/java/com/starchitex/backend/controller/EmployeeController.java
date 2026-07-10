@@ -4,6 +4,7 @@ import com.starchitex.backend.model.Employee;
 import com.starchitex.backend.service.EmployeeService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class EmployeeController {
         return employeeService.getEmployeesByBranchId(branchId);
     }
 
+    @PreAuthorize("hasAuthority('ADMIN') or #employee.branchId() == authentication.principal.branchId")
     @PostMapping
     public ResponseEntity<String> createEmployee(@RequestBody Employee employee) {
         boolean isCreated = employeeService.createEmployee(employee);
@@ -44,6 +46,7 @@ public class EmployeeController {
         }
     }
 
+    @PreAuthorize("hasAuthority('ADMIN') or #employee.branchId() == authentication.principal.branchId")
     @PutMapping("/{id}")
     public ResponseEntity<String> updateEmployee(@PathVariable int id, @RequestBody Employee employee) {
         Employee employeeToUpdate = new Employee(

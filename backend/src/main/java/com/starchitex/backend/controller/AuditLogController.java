@@ -32,13 +32,4 @@ public class AuditLogController {
         return auditLogService.getAuditLogsByTableName(tableName);
     }
 
-    @PostMapping
-    public ResponseEntity<String> createAuditLog(@RequestBody AuditLog auditLog) {
-        boolean isCreated = auditLogService.createAuditLog(auditLog);
-        if (isCreated) {
-            return ResponseEntity.status(201).body("Audit log created successfully!");
-        } else {
-            return ResponseEntity.status(400).body("Failed to create audit log.");
-        }
-    }
 }

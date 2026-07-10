@@ -4,6 +4,7 @@ import com.starchitex.backend.model.Room;
 import com.starchitex.backend.service.RoomService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public class RoomController {
         return roomService.getRoomsByBranchId(branchId);
     }
 
+    @PreAuthorize("hasAuthority('ADMIN') or #room.branchId() == authentication.principal.branchId")
     @PostMapping
     public ResponseEntity<String> createRoom(@RequestBody Room room) {
         boolean isCreated = roomService.createRoom(room);
@@ -44,6 +46,7 @@ public class RoomController {
         }
     }
 
+    @PreAuthorize("hasAuthority('ADMIN') or #room.branchId() == authentication.principal.branchId")
     @PutMapping("/{id}")
     public ResponseEntity<String> updateRoom(@PathVariable int id, @RequestBody Room room) {
         Room roomToUpdate = new Room(

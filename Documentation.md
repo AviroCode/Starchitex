@@ -191,3 +191,17 @@ Your Spring Boot application is now configured to automatically read these envir
   - **Financial Deletion Protection:** Changed `ON DELETE CASCADE` to `ON DELETE RESTRICT` for Guest and Invoice linkages. You cannot delete a guest who owes money or has an invoice history, ensuring strict financial auditing.
   - **Logical Timestamps & Defaults:** Added `DEFAULT` statuses (e.g., `'Pending'`, `'Unpaid'`) across the board, aligned casing with the application testing suite (Title Case), and added checks to guarantee `check_out_time >= check_in_time`.
   - **Performance Indexes:** Created B-Tree indexes on 6 critical Foreign Keys (e.g., `guest_id`, `branch_id`, `reservation_id`) to prevent table-scan performance degradation at scale.
+
+## Backend Security and Business-Logic Remediation (Phase 2)
+To secure the Spring Boot backend against race conditions, unauthorized data access, and state-machine violations, the following 9 application-level integrity and security flaws have been fixed:
+
+1. **Booking Availability Lock**: `ReservationService.createReservation()` is now `@Transactional` and throws an error if checkout is before check-in. Note: Real overlap checking relies on the PostgreSQL trigger `prevent_double_booking` when `ReservationRoom` records are inserted.
+2. **Reservation Status State Machine**: The generic `PUT /api/reservations/{id}` endpoint was entirely removed. It was replaced with three strict REST endpoints (`POST /api/reservations/{id}/check-in`, `/check-out`, `/cancel`) which automatically apply logic-gated transitions and inject precise server-side timestamps.
+3. **Database Financial Validation**: Created `recalculateInvoiceTotal` in `InvoiceRepository`. `InvoiceService` now executes a raw SQL `SELECT calculate_invoice_total(?)` against the DB, enforcing the PostgreSQL server as the ultimate source of truth for invoice mathematics.
+4. **Overpayment & Underpayment Protection**: `PaymentService.createPayment` now calculates the total paid against an invoice before persisting the new payment, rejecting any payment that exceeds the `total_amount`.
+5. **Invoice Status Automation**: `PaymentService` automatically cascades payment calculations to update the `Invoice` status to `Partially Paid` or `Paid`, ensuring financial consistency without client intervention.
+6. **JWT Branch Integration (RLS Context)**: Modified `JwtUtil.java` to bake `branchId` directly into JWT claims upon login. This context persists statelessly across the application.
+7. **Custom Spring Security Principal**: Updated `CustomUserDetailsService` to fetch the employee's `branchId` from the database and inject it into a new `CustomUserDetails` object, allowing Spring Security to access the user's branch anywhere in the app.
+8. **Endpoint Authorization**: Applied `@PreAuthorize("hasAuthority('ADMIN') or #param.branchId() == authentication.principal.branchId")` directly to the `Employee`, `Room`, and `Reservation` controllers to instantly block cross-branch data manipulation.
+9. **Sensitive Field Protection**: Added Jackson `@JsonIgnore` to `passwordHash` inside `EmployeeCredentials` and `salary` inside `Employee`, preventing catastrophic PII/Auth data leaks over REST endpoints.
+10. **Audit Log Security**: Removed the `POST /api/audit-logs` endpoint. Clients can no longer arbitrarily spoof audit records; audit generation is now exclusively restricted to internal services and DB triggers.

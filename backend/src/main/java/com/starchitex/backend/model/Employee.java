@@ -2,6 +2,7 @@ package com.starchitex.backend.model;
 
 import java.time.LocalDate;
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public record Employee(
     Integer employeeId,
@@ -14,6 +15,6 @@ public record Employee(
     String phone,
     String email,
     LocalDate hireDate,
-    BigDecimal salary,
+    @JsonIgnore BigDecimal salary,
     String employmentStatus
 ) {}
