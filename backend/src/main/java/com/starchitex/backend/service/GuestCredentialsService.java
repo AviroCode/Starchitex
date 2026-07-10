@@ -2,6 +2,7 @@ package com.starchitex.backend.service;
 
 import com.starchitex.backend.model.GuestCredentials;
 import com.starchitex.backend.repository.GuestCredentialsRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -12,9 +13,11 @@ import java.util.Optional;
 public class GuestCredentialsService {
 
     private final GuestCredentialsRepository guestCredentialsRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public GuestCredentialsService(GuestCredentialsRepository guestCredentialsRepository) {
+    public GuestCredentialsService(GuestCredentialsRepository guestCredentialsRepository, PasswordEncoder passwordEncoder) {
         this.guestCredentialsRepository = guestCredentialsRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<GuestCredentials> getAllCredentials() {
@@ -34,11 +37,22 @@ public class GuestCredentialsService {
     }
 
     public boolean createCredentials(GuestCredentials credentials) {
-        return guestCredentialsRepository.save(credentials) > 0;
+        String hashed = passwordEncoder.encode(credentials.passwordHash());
+        GuestCredentials securedCreds = new GuestCredentials(
+                credentials.guestCredId(),
+                credentials.guestId(),
+                credentials.username(),
+                hashed,
+                credentials.roleId(),
+                credentials.createdAt(),
+                credentials.lastLogin()
+        );
+        return guestCredentialsRepository.save(securedCreds) > 0;
     }
 
-    public boolean updatePassword(int guestCredId, String newPasswordHash) {
-        return guestCredentialsRepository.updatePassword(guestCredId, newPasswordHash) > 0;
+    public boolean updatePassword(int guestCredId, String newPassword) {
+        String hashed = passwordEncoder.encode(newPassword);
+        return guestCredentialsRepository.updatePassword(guestCredId, hashed) > 0;
     }
 
     public boolean updateLastLogin(int guestCredId, LocalDateTime lastLogin) {
