@@ -179,3 +179,15 @@ Your Spring Boot application is now configured to automatically read these envir
   - **Views:** Created `AvailableRoomsToday` SQL View in `schema.sql` to abstract a complex 3-table JOIN. Updated Java `RoomRepository` to query this view seamlessly using a new `AvailableRoomDTO`.
   - **Indexes:** Created `idx_guest_email` and `idx_reservation_dates` indexes in `schema.sql` to optimize B-Tree lookups on frequently queried columns, drastically improving read speeds.
   - **Transactions (TCL):** Integrated `@Transactional` from Spring Framework into `InvoiceService.java`. This guarantees atomicity (ACID compliance) by wrapping operations in `BEGIN` and `COMMIT` commands, ensuring rollbacks happen if the Java runtime crashes mid-operation.
+
+## Feature: Enterprise Data Integrity (12 Schema Fixes)
+- **What was done:** Resolved 12 critical structural vulnerabilities in the database to guarantee real-world operational security and mathematical accuracy.
+- **Details:**
+  - **Double-Booking Prevention:** Added a PL/pgSQL trigger `prevent_double_booking` to `ReservationRoom` that mathematically blocks overlapping reservations for the same physical room.
+  - **Branch Cross-Check:** Added `enforce_branch_consistency` trigger to guarantee a reservation cannot be assigned a room in a different branch.
+  - **Reservation Branch ID:** Added `branch_id` to `Reservation` to support real-world workflows where a guest books at a specific branch *before* a physical room is assigned, enabling high-performance Row-Level Security.
+  - **Invoice Arithmetic Integrity:** Added a CHECK constraint `chk_invoice_total` to guarantee that `total_amount = GREATEST(0, (sub_total - discount) + tax_amount)`. It is impossible for an invoice total to be mathematically corrupted.
+  - **Strict Payment Methods:** Constrained `payment_method` to real-world channels (Cash, Credit Card, Bank Transfer, etc).
+  - **Financial Deletion Protection:** Changed `ON DELETE CASCADE` to `ON DELETE RESTRICT` for Guest and Invoice linkages. You cannot delete a guest who owes money or has an invoice history, ensuring strict financial auditing.
+  - **Logical Timestamps & Defaults:** Added `DEFAULT` statuses (e.g., `'Pending'`, `'Unpaid'`) across the board, aligned casing with the application testing suite (Title Case), and added checks to guarantee `check_out_time >= check_in_time`.
+  - **Performance Indexes:** Created B-Tree indexes on 6 critical Foreign Keys (e.g., `guest_id`, `branch_id`, `reservation_id`) to prevent table-scan performance degradation at scale.
