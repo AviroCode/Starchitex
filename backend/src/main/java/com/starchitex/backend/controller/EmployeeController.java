@@ -24,7 +24,7 @@ public class EmployeeController {
         return employeeService.getAllEmployees();
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @GetMapping("/{id}")
     public ResponseEntity<Employee> getEmployeeById(@PathVariable int id) {
         return employeeService.getEmployeeById(id)

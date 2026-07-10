@@ -57,4 +57,11 @@ public class ReservationRoomRepository {
         String sql = "DELETE FROM ReservationRoom WHERE reservation_id = ? AND room_id = ?";
         return jdbcTemplate.update(sql, reservationId, roomId);
     }
+
+    public int deleteByReservationId(int reservationId) {
+        // Deleting all rows fires the sync_room_availability trigger on each deleted row,
+        // which sets each room's RoomAvailability back to 'Available' for the freed dates.
+        String sql = "DELETE FROM ReservationRoom WHERE reservation_id = ?";
+        return jdbcTemplate.update(sql, reservationId);
+    }
 }

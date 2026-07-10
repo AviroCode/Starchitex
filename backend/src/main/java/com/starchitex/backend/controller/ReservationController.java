@@ -24,7 +24,7 @@ public class ReservationController {
         return reservationService.getAllReservations();
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @GetMapping("/{reservationId}")
     public ResponseEntity<Reservation> getReservationById(@PathVariable int reservationId) {
         return reservationService.getReservationById(reservationId)
@@ -32,7 +32,8 @@ public class ReservationController {
                 .orElse(ResponseEntity.notFound().build());
     }
     
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
+    // Staff or the guest themselves can list a guest's reservations
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or #guestId == authentication.principal.guestId")
     @GetMapping("/guest/{guestId}")
     public List<Reservation> getReservationsByGuestId(@PathVariable int guestId) {
         return reservationService.getReservationsByGuestId(guestId);
@@ -46,6 +47,16 @@ public class ReservationController {
             return ResponseEntity.status(201).body("Reservation created successfully!");
         } else {
             return ResponseEntity.status(400).body("Failed to create reservation.");
+        }
+    }
+
+    @PostMapping("/{reservationId}/confirm")
+    public ResponseEntity<String> confirm(@PathVariable int reservationId) {
+        try {
+            boolean success = reservationService.confirm(reservationId);
+            return success ? ResponseEntity.ok("Confirmed successfully!") : ResponseEntity.badRequest().body("Confirm failed.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 

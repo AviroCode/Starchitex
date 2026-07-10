@@ -24,7 +24,7 @@ public class RoomController {
         return roomService.getAllRooms();
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @GetMapping("/{id}")
     public ResponseEntity<Room> getRoomById(@PathVariable int id) {
         return roomService.getRoomById(id)

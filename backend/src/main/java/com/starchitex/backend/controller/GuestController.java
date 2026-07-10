@@ -24,7 +24,7 @@ public class GuestController {
         return guestService.getAllGuests();
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @GetMapping("/{id}")
     public ResponseEntity<Guest> getGuestById(@PathVariable int id) {
         return guestService.getGuestById(id)
