@@ -694,3 +694,33 @@ CREATE TRIGGER trg_update_invoice_status
 AFTER INSERT OR DELETE ON Payment
 FOR EACH ROW EXECUTE FUNCTION update_invoice_status_on_payment();
 
+-- -----------------------------------------------------------------------
+-- Trigger: recalculate_invoice_total_on_item_change
+-- Fires AFTER INSERT OR UPDATE OR DELETE ON InvoiceItem.
+-- Automatically calls calculate_invoice_total() to update the invoice total
+-- whenever a line item is added, modified, or removed.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION trigger_recalculate_invoice_total()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_invoice_id INT;
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        v_invoice_id := OLD.invoice_id;
+    ELSE
+        v_invoice_id := NEW.invoice_id;
+    END IF;
+
+    -- Call the existing stored procedure to do the math and update Invoice
+    PERFORM calculate_invoice_total(v_invoice_id);
+
+    RETURN NULL; -- AFTER trigger
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_recalculate_invoice_total_on_item_change ON InvoiceItem;
+CREATE TRIGGER trg_recalculate_invoice_total_on_item_change
+AFTER INSERT OR UPDATE OR DELETE ON InvoiceItem
+FOR EACH ROW EXECUTE FUNCTION trigger_recalculate_invoice_total();
+
+

@@ -243,3 +243,10 @@ Continuing the DB-first transition, the logic for updating the invoice status ba
 
 - **New trigger `trg_update_invoice_status_on_payment` (AFTER INSERT OR DELETE ON `Payment`)**: The function `update_invoice_status_on_payment()` is triggered after any payment mutation. It calculates the total amount paid so far for the associated invoice and dynamically updates the invoice `status` to `'Paid'`, `'Partially Paid'`, or `'Unpaid'`. 
 - **`PaymentService` simplification**: The manual update to `Invoice.status` within Java has been fully removed. This guarantees that `Invoice.status` stays consistent regardless of how payments are entered (e.g. via direct script or other interfaces), closing the silent staleness loop.
+
+## DB-First Refactor — Invoice Recalculation Trigger (Phase 7)
+
+The logic for recalculating invoice totals (`sub_total`, `tax_amount`, `total_amount`) when line items change has been migrated to the database:
+
+- **New trigger `trg_recalculate_invoice_total_on_item_change` (AFTER INSERT OR UPDATE OR DELETE ON `InvoiceItem`)**: This trigger automatically invokes the existing `calculate_invoice_total(invoice_id)` stored procedure whenever an invoice item is mutated.
+- **`InvoiceItemService` simplification**: The manual wiring of `InvoiceService` and explicit calls to `recalculateInvoice()` have been removed from the Java layer. The database now natively guarantees that an invoice's totals stay perfectly synchronized with its underlying line items without requiring app-level coordination.

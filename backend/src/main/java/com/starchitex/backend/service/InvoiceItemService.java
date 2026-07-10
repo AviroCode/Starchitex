@@ -12,11 +12,9 @@ import java.util.Optional;
 public class InvoiceItemService {
 
     private final InvoiceItemRepository invoiceItemRepository;
-    private final InvoiceService invoiceService;
 
-    public InvoiceItemService(InvoiceItemRepository invoiceItemRepository, InvoiceService invoiceService) {
+    public InvoiceItemService(InvoiceItemRepository invoiceItemRepository) {
         this.invoiceItemRepository = invoiceItemRepository;
-        this.invoiceService = invoiceService;
     }
 
     public List<InvoiceItem> getAllInvoiceItems() {
@@ -33,25 +31,17 @@ public class InvoiceItemService {
 
     @Transactional
     public boolean createInvoiceItem(InvoiceItem item) {
-        boolean saved = invoiceItemRepository.save(item) > 0;
-        if (saved) invoiceService.recalculateInvoice(item.invoiceId());
-        return saved;
+        // Recalculation of invoice totals is handled by trg_recalculate_invoice_total_on_item_change (AFTER INSERT/UPDATE/DELETE)
+        return invoiceItemRepository.save(item) > 0;
     }
 
     @Transactional
     public boolean updateInvoiceItem(InvoiceItem item) {
-        boolean updated = invoiceItemRepository.update(item) > 0;
-        if (updated) invoiceService.recalculateInvoice(item.invoiceId());
-        return updated;
+        return invoiceItemRepository.update(item) > 0;
     }
 
     @Transactional
     public boolean deleteInvoiceItem(int invoiceItemId) {
-        // Fetch first so we know which invoice to recalculate after deletion
-        InvoiceItem item = invoiceItemRepository.findById(invoiceItemId)
-                .orElseThrow(() -> new IllegalArgumentException("InvoiceItem not found"));
-        boolean deleted = invoiceItemRepository.delete(invoiceItemId) > 0;
-        if (deleted) invoiceService.recalculateInvoice(item.invoiceId());
-        return deleted;
+        return invoiceItemRepository.delete(invoiceItemId) > 0;
     }
 }
