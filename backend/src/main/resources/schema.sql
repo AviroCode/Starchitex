@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS Room (
     room_number VARCHAR(50) NOT NULL,
     floor INT,
     branch_id INT NOT NULL REFERENCES Branch(branch_id),
-    room_type_id INT NOT NULL REFERENCES RoomType(room_type_id)
+    room_type_id INT NOT NULL REFERENCES RoomType(room_type_id),
+    UNIQUE (branch_id, room_number)
 );
 
 CREATE TABLE IF NOT EXISTS Employee (
@@ -117,14 +118,14 @@ CREATE TABLE IF NOT EXISTS GuestCredentials (
 CREATE TABLE IF NOT EXISTS Reservation (
     reservation_id SERIAL PRIMARY KEY,
     branch_id INT NOT NULL REFERENCES Branch(branch_id),
-    guest_id INT NOT NULL REFERENCES Guest(guest_id),
+    guest_id INT NOT NULL REFERENCES Guest(guest_id) ON DELETE RESTRICT,
     check_in_date DATE NOT NULL,
     check_out_date DATE NOT NULL,
     actual_checkin_time TIMESTAMP,
     actual_checkout_time TIMESTAMP,
     booking_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     num_of_guests INT NOT NULL,
-    status VARCHAR(50) NOT NULL
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending'
 );
 
 CREATE TABLE IF NOT EXISTS AuditLog (
@@ -153,7 +154,8 @@ CREATE TABLE IF NOT EXISTS RoomAvailability (
     calendar_date DATE NOT NULL,
     status VARCHAR(50) NOT NULL,
     reservation_id INT REFERENCES Reservation(reservation_id),
-    price_override DECIMAL(10, 2)
+    price_override DECIMAL(10, 2),
+    UNIQUE (room_id, calendar_date)
 );
 
 CREATE TABLE IF NOT EXISTS ReservationStatusLog (
@@ -167,29 +169,29 @@ CREATE TABLE IF NOT EXISTS ReservationStatusLog (
 
 CREATE TABLE IF NOT EXISTS Invoice (
     invoice_id SERIAL PRIMARY KEY,
-    reservation_id INT NOT NULL REFERENCES Reservation(reservation_id),
-    payer_guest_id INT NOT NULL REFERENCES Guest(guest_id),
+    reservation_id INT NOT NULL REFERENCES Reservation(reservation_id) ON DELETE RESTRICT,
+    payer_guest_id INT NOT NULL REFERENCES Guest(guest_id) ON DELETE RESTRICT,
     invoice_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     sub_total DECIMAL(10, 2) NOT NULL,
     tax_amount DECIMAL(10, 2) NOT NULL,
     discount DECIMAL(10, 2) DEFAULT 0,
     total_amount DECIMAL(10, 2) NOT NULL,
-    status VARCHAR(50) NOT NULL
+    status VARCHAR(50) NOT NULL DEFAULT 'Unpaid'
 );
 
 CREATE TABLE IF NOT EXISTS ServiceRequest (
     request_id SERIAL PRIMARY KEY,
-    reservation_id INT NOT NULL REFERENCES Reservation(reservation_id),
+    reservation_id INT NOT NULL REFERENCES Reservation(reservation_id) ON DELETE RESTRICT,
     service_id INT NOT NULL REFERENCES Service(service_id),
     description TEXT,
     request_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     handled_by INT REFERENCES Employee(employee_id)
 );
 
 CREATE TABLE IF NOT EXISTS FacilityBooking (
     facility_booking_id SERIAL PRIMARY KEY,
-    reservation_id INT NOT NULL REFERENCES Reservation(reservation_id),
+    reservation_id INT NOT NULL REFERENCES Reservation(reservation_id) ON DELETE RESTRICT,
     facility_id INT NOT NULL REFERENCES Facility(facility_id),
     booking_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     start_date_time TIMESTAMP NOT NULL,
@@ -203,7 +205,7 @@ CREATE TABLE IF NOT EXISTS RoomTask (
     description TEXT,
     assigned_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_time TIMESTAMP,
-    status VARCHAR(50) NOT NULL
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending'
 );
 
 CREATE TABLE IF NOT EXISTS FacilityTask (
@@ -213,7 +215,7 @@ CREATE TABLE IF NOT EXISTS FacilityTask (
     description TEXT,
     assigned_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_time TIMESTAMP,
-    status VARCHAR(50) NOT NULL
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending'
 );
 
 CREATE TABLE IF NOT EXISTS RoomMaintenance (
@@ -225,7 +227,7 @@ CREATE TABLE IF NOT EXISTS RoomMaintenance (
     priority VARCHAR(50),
     completion_date TIMESTAMP,
     description TEXT,
-    status VARCHAR(50) NOT NULL
+    status VARCHAR(50) NOT NULL DEFAULT 'Reported'
 );
 
 CREATE TABLE IF NOT EXISTS FacilityMaintenance (
@@ -237,13 +239,13 @@ CREATE TABLE IF NOT EXISTS FacilityMaintenance (
     priority VARCHAR(50),
     completion_date TIMESTAMP,
     description TEXT,
-    status VARCHAR(50) NOT NULL
+    status VARCHAR(50) NOT NULL DEFAULT 'Reported'
 );
 
 -- 5. Tables referencing Group 4
 CREATE TABLE IF NOT EXISTS InvoiceItem (
     invoice_item_id SERIAL PRIMARY KEY,
-    invoice_id INT NOT NULL REFERENCES Invoice(invoice_id) ON DELETE CASCADE,
+    invoice_id INT NOT NULL REFERENCES Invoice(invoice_id) ON DELETE RESTRICT,
     item_type VARCHAR(100) NOT NULL,
     quantity INT NOT NULL,
     amount DECIMAL(10, 2) NOT NULL
@@ -251,12 +253,13 @@ CREATE TABLE IF NOT EXISTS InvoiceItem (
 
 CREATE TABLE IF NOT EXISTS Payment (
     payment_id SERIAL PRIMARY KEY,
-    invoice_id INT NOT NULL REFERENCES Invoice(invoice_id) ON DELETE CASCADE,
+    invoice_id INT NOT NULL REFERENCES Invoice(invoice_id) ON DELETE RESTRICT,
     payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     amount DECIMAL(10, 2) NOT NULL,
     payment_method VARCHAR(50) NOT NULL,
     transaction_ref VARCHAR(255)
 );
+ALTER TABLE Payment ADD CONSTRAINT chk_payment_method CHECK (payment_method IN ('Cash', 'Credit Card', 'Debit Card', 'Bank Transfer', 'Digital Wallet', 'Other'));
 
 -- 6. Triggers and Functions (PL/pgSQL)
 
@@ -269,7 +272,7 @@ BEGIN
         VALUES ('DELETE', 'Reservation', OLD.reservation_id::VARCHAR, 'Guest ID: ' || OLD.guest_id || ', Status: ' || OLD.status);
         RETURN OLD;
     ELSIF (TG_OP = 'UPDATE') THEN
-        IF (OLD.status <> NEW.status AND NEW.status = 'CANCELLED') THEN
+        IF (OLD.status <> NEW.status AND NEW.status = 'Cancelled') THEN
             INSERT INTO AuditLog(action, table_name, pk_of_table, affected_col, old_value, new_value)
             VALUES ('UPDATE_CANCEL', 'Reservation', OLD.reservation_id::VARCHAR, 'status', OLD.status, NEW.status);
         END IF;
@@ -285,6 +288,60 @@ CREATE TRIGGER trg_reservation_audit
 AFTER UPDATE OR DELETE ON Reservation
 FOR EACH ROW
 EXECUTE FUNCTION log_reservation_audit();
+
+
+-- Trigger to prevent double booking of rooms
+CREATE OR REPLACE FUNCTION prevent_double_booking()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_conflicts INT;
+BEGIN
+    SELECT COUNT(*) INTO v_conflicts
+    FROM ReservationRoom rr
+    JOIN Reservation r_existing ON rr.reservation_id = r_existing.reservation_id
+    JOIN Reservation r_new ON NEW.reservation_id = r_new.reservation_id
+    WHERE rr.room_id = NEW.room_id
+      AND r_existing.status NOT IN ('Cancelled', 'Checked Out')
+      AND r_existing.reservation_id != NEW.reservation_id
+      AND (r_new.check_in_date < r_existing.check_out_date AND r_new.check_out_date > r_existing.check_in_date);
+      
+    IF v_conflicts > 0 THEN
+        RAISE EXCEPTION 'Double booking detected for room_id % on requested dates', NEW.room_id;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prevent_double_booking ON ReservationRoom;
+CREATE TRIGGER trg_prevent_double_booking
+BEFORE INSERT OR UPDATE ON ReservationRoom
+FOR EACH ROW EXECUTE FUNCTION prevent_double_booking();
+
+
+
+-- Trigger to enforce branch consistency between Reservation and Room
+CREATE OR REPLACE FUNCTION enforce_branch_consistency()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_res_branch INT;
+    v_room_branch INT;
+BEGIN
+    SELECT branch_id INTO v_res_branch FROM Reservation WHERE reservation_id = NEW.reservation_id;
+    SELECT branch_id INTO v_room_branch FROM Room WHERE room_id = NEW.room_id;
+    
+    IF v_res_branch != v_room_branch THEN
+        RAISE EXCEPTION 'Branch consistency failed: Reservation branch % does not match Room branch %', v_res_branch, v_room_branch;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_branch_consistency ON ReservationRoom;
+CREATE TRIGGER trg_enforce_branch_consistency
+BEFORE INSERT OR UPDATE ON ReservationRoom
+FOR EACH ROW EXECUTE FUNCTION enforce_branch_consistency();
 
 -- 7. Standalone Stored Procedures (PL/pgSQL)
 
@@ -339,11 +396,18 @@ ALTER TABLE Service ADD CONSTRAINT chk_service_price CHECK (price >= 0);
 ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_dates CHECK (check_out_date > check_in_date);
 ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_guests CHECK (num_of_guests > 0);
 
+
+-- Ensure logical timestamps
+ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_times CHECK (actual_checkout_time IS NULL OR actual_checkin_time IS NULL OR actual_checkout_time >= actual_checkin_time);
+ALTER TABLE RoomTask ADD CONSTRAINT chk_roomtask_times CHECK (completed_time IS NULL OR completed_time >= assigned_time);
+ALTER TABLE FacilityTask ADD CONSTRAINT chk_facilitytask_times CHECK (completed_time IS NULL OR completed_time >= assigned_time);
+
 -- Ensure Facility Booking times are logical
 ALTER TABLE FacilityBooking ADD CONSTRAINT chk_facility_booking_times CHECK (end_date_time > start_date_time);
 
 -- Ensure Invoice amounts are not negative
 ALTER TABLE Invoice ADD CONSTRAINT chk_invoice_amounts CHECK (sub_total >= 0 AND tax_amount >= 0 AND discount >= 0 AND total_amount >= 0);
+ALTER TABLE Invoice ADD CONSTRAINT chk_invoice_total CHECK (total_amount = GREATEST(0, (sub_total - COALESCE(discount, 0)) + tax_amount));
 ALTER TABLE InvoiceItem ADD CONSTRAINT chk_invoice_item_amount CHECK (amount >= 0 AND quantity > 0);
 
 
@@ -356,9 +420,17 @@ SELECT r.room_id, r.room_number, r.floor, rt.type_name, ra.price_override, ra.st
 FROM Room r
 JOIN RoomType rt ON r.room_type_id = rt.room_type_id
 JOIN RoomAvailability ra ON r.room_id = ra.room_id
-WHERE ra.status = 'AVAILABLE' AND ra.calendar_date = CURRENT_DATE;
+WHERE ra.status = 'Available' AND ra.calendar_date = CURRENT_DATE;
 
 -- Indexes (Performance Optimization)
+
+CREATE INDEX IF NOT EXISTS idx_reservation_guest_id ON Reservation(guest_id);
+CREATE INDEX IF NOT EXISTS idx_reservation_branch_id ON Reservation(branch_id);
+CREATE INDEX IF NOT EXISTS idx_room_branch_id ON Room(branch_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_reservation_id ON Invoice(reservation_id);
+CREATE INDEX IF NOT EXISTS idx_payment_invoice_id ON Payment(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_room_availability_room_id ON RoomAvailability(room_id);
+
 -- Speeds up login and guest lookup
 CREATE INDEX IF NOT EXISTS idx_guest_email ON Guest(email);
 
@@ -374,47 +446,47 @@ SELECT
     COUNT(invoice_id) AS total_invoices,
     SUM(total_amount) AS total_revenue
 FROM Invoice
-WHERE status = 'PAID'
+WHERE status = 'Paid'
 GROUP BY EXTRACT(YEAR FROM invoice_date), EXTRACT(MONTH FROM invoice_date)
 ORDER BY invoice_year DESC, invoice_month DESC;
 
 -- Status constraints 
-ALTER TABLE Branch ADD CONSTRAINT chk_branch_status CHECK (status IN ('ACTIVE', 'INACTIVE'));
+ALTER TABLE Branch ADD CONSTRAINT chk_branch_status CHECK (status IN ('Active', 'Inactive'));
 
 -- Enforce valid Employee employment statuses
 ALTER TABLE Employee ADD CONSTRAINT chk_employee_status 
-CHECK (employment_status IN ('ACTIVE', 'TERMINATED', 'ON_LEAVE'));
+CHECK (employment_status IN ('Active', 'Terminated', 'On Leave'));
 
 -- Enforce valid RoomAvailability status
 ALTER TABLE RoomAvailability ADD CONSTRAINT chk_room_availability_status 
-CHECK (status IN ('AVAILABLE', 'OCCUPIED', 'MAINTENANCE'));
+CHECK (status IN ('Available', 'Occupied', 'Maintenance'));
 
 -- Enforce valid Reservation status
 ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_status 
-CHECK (status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'));
+CHECK (status IN ('Pending', 'Confirmed', 'Checked In', 'Checked Out', 'Cancelled'));
 
 -- Enforce valid ReservationStatusLog status
 ALTER TABLE ReservationStatusLog ADD CONSTRAINT chk_reservation_status_log_status 
-CHECK (status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'));
+CHECK (status IN ('Pending', 'Confirmed', 'Checked In', 'Checked Out', 'Cancelled'));
 
 -- Enforce valid Invoice status
 ALTER TABLE Invoice ADD CONSTRAINT chk_invoice_status 
-CHECK (status IN ('UNPAID', 'PAID', 'REFUNDED'));
+CHECK (status IN ('Unpaid', 'Partially Paid', 'Paid', 'Refunded'));
 
 -- Enforce valid ServiceRequest status
 ALTER TABLE ServiceRequest ADD CONSTRAINT chk_service_request_status 
-CHECK (status IN ('PENDING', 'COMPLETED', 'CANCELLED'));
+CHECK (status IN ('Pending', 'Completed', 'Cancelled'));
 
 -- Enforce valid RoomTask and FacilityTask statuses
 ALTER TABLE RoomTask ADD CONSTRAINT chk_room_task_status 
-CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED'));
+CHECK (status IN ('Pending', 'In Progress', 'Completed'));
 
 ALTER TABLE FacilityTask ADD CONSTRAINT chk_facility_task_status 
-CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED'));
+CHECK (status IN ('Pending', 'In Progress', 'Completed'));
 
 -- Enforce valid RoomMaintenance and FacilityMaintenance statuses
 ALTER TABLE RoomMaintenance ADD CONSTRAINT chk_room_maintenance_status 
-CHECK (status IN ('REPORTED', 'IN_PROGRESS', 'RESOLVED'));
+CHECK (status IN ('Reported', 'In Progress', 'Completed'));
 
 ALTER TABLE FacilityMaintenance ADD CONSTRAINT chk_facility_maintenance_status 
-CHECK (status IN ('REPORTED', 'IN_PROGRESS', 'RESOLVED'));
+CHECK (status IN ('Reported', 'In Progress', 'Completed'));
