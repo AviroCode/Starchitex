@@ -205,3 +205,16 @@ To secure the Spring Boot backend against race conditions, unauthorized data acc
 8. **Endpoint Authorization**: Applied `@PreAuthorize("hasAuthority('ADMIN') or #param.branchId() == authentication.principal.branchId")` directly to the `Employee`, `Room`, and `Reservation` controllers to instantly block cross-branch data manipulation.
 9. **Sensitive Field Protection**: Added Jackson `@JsonIgnore` to `passwordHash` inside `EmployeeCredentials` and `salary` inside `Employee`, preventing catastrophic PII/Auth data leaks over REST endpoints.
 10. **Audit Log Security**: Removed the `POST /api/audit-logs` endpoint. Clients can no longer arbitrarily spoof audit records; audit generation is now exclusively restricted to internal services and DB triggers.
+
+## Database Schema and Backend Security Hardening (Phase 3)
+To resolve remaining data-integrity gaps and resolve vulnerabilities found in the security setup, the following changes were applied:
+
+1. **InvoiceItem Normalization & Custom Charges**: Expanded `InvoiceItem` with nullable `room_id` and `service_id` foreign keys, and a `description` field. We added a PostgreSQL trigger `enforce_invoice_item_price` which calculates the amount based on target room type price or service price for standard charges, but allows custom amounts for `'Damage'`, `'Maintenance'`, and `'Other'` charges.
+2. **Actual Check-in/out Constraints (A.11)**: Added a database constraint `chk_reservation_times` verifying that `actual_checkin_time` and `actual_checkout_time` strictly fall inside the reservation's `check_in_date` and `check_out_date` range.
+3. **Room Availability Automation**: Authored an SQL trigger `trg_sync_room_availability` on `ReservationRoom`. When rooms are linked or removed from reservations, the `RoomAvailability` calendar is automatically populated with `'Occupied'` or `'Available'` status across the booked date range.
+4. **All-Branch Authorization Fix**: Injected `RoleRepository` into `CustomUserDetailsService` to properly load the literal role name and map it to Spring Security roles (e.g. `ROLE_System Administrator`). Replaced broken `hasAuthority('ADMIN')` expressions with `hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')` to allow all-branch roles access across branches.
+5. **GET Endpoint Authorization**: Applied branch-level security rules to all `GET` methods in controllers (e.g., `EmployeeController`, `RoomController`, `ReservationController`, and `GuestController`) to lock down cross-branch reads.
+6. **Graceful DB Error Catching**: Wrapped `assignRoomToReservation` in `ReservationRoomController` with a try/catch to return a clean `400 Bad Request` when double-booking triggers fail.
+7. **Pessimistic Locking**: Wrapped payment processes with a `FOR UPDATE` query lock inside `InvoiceRepository` (`findByIdForUpdate`) to lock invoice records and protect against concurrent payment race conditions.
+8. **Removed Invoice PUT Bypass**: Deleted the arbitrary `PUT /api/invoices/{id}` method to enforce payments as the sole mechanism for updating invoice statuses.
+
