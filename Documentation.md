@@ -257,3 +257,17 @@ The reservation status state machine logic has been completely migrated from the
 
 - **New trigger `trg_enforce_reservation_state_machine` (BEFORE UPDATE ON `Reservation`)**: This trigger acts as a strict state machine validator. It inspects `OLD.status` and `NEW.status` and raises a `check_violation` exception for any illegal transitions. The allowed paths are strictly enforced (`Pending` → `Confirmed` → `Checked In` → `Checked Out`). Cancelled and Checked Out are enforced as terminal states.
 - **`ReservationService` simplification**: All four transition methods (`confirm`, `checkIn`, `checkOut`, `cancel`) have had their ad-hoc `if (!res.status().equals(...))` guard clauses removed. The Java layer simply attempts the status update and relies on the PostgreSQL trigger to block illegal state transitions.
+
+## DB-First Refactor — PostgreSQL Row-Level Security (Phase 9)
+
+The most significant architectural shift to a database-first model: moving multi-tenant (branch) data isolation completely out of the application layer into native PostgreSQL Row-Level Security (RLS). This fulfills the project's core promise of database-level security and makes isolation entirely bypass-proof.
+
+- **`schema.sql` (RLS Configuration)**:
+  - Enabled and forced `ROW LEVEL SECURITY` on all tenant-specific tables (`Branch`, `Employee`, `Room`, `Reservation`, `Invoice`, `Payment`, `RoomTask`, etc.).
+  - Added `CREATE POLICY` statements that read PostgreSQL session variables (`app.current_branch_id`, `app.current_guest_id`, `app.is_super_admin`) to dynamically filter rows. A branch employee querying `SELECT * FROM Room` will now organically only receive rows matching their `branch_id`, without any explicit `WHERE` clause from the Java backend.
+- **`RlsDataSource` & `DataSourceConfig`**:
+  - Implemented a dynamic connection proxy (`RlsDataSource.java`) wrapped around the default HikariCP pool.
+  - Intercepts `getConnection()` to extract the current user's security context (from Spring Security) and executes `SET app.current_branch_id = X` directly on the physical PostgreSQL connection.
+  - Intercepts `Connection.close()` to issue `RESET` commands, securely scrubbing the tenant context before the connection is returned to the Hikari pool to prevent cross-contamination.
+- **Controller `@PreAuthorize` Cleanup**:
+  - With PostgreSQL enforcing isolation universally at the lowest level, all redundant SpEL checks (e.g., `#branchId == authentication.principal.branchId`) have been removed from `RoomController`, `ReservationController`, `EmployeeController`, and `ReservationRoomController`.

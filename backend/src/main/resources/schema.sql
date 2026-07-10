@@ -763,3 +763,141 @@ FOR EACH ROW EXECUTE FUNCTION enforce_reservation_state_machine();
 
 
 
+-- ====================================================================================
+-- 10. Row-Level Security (RLS)
+-- ====================================================================================
+
+-- Helper function to check if the current user is a super admin
+CREATE OR REPLACE FUNCTION is_super_admin() RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN current_setting('app.is_super_admin', true) = 'true';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Helper function to get current branch ID safely
+CREATE OR REPLACE FUNCTION current_branch_id() RETURNS INT AS $$
+DECLARE
+    val TEXT;
+BEGIN
+    val := current_setting('app.current_branch_id', true);
+    IF val = '' OR val IS NULL THEN
+        RETURN NULL;
+    END IF;
+    RETURN val::INT;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Helper function to get current guest ID safely
+CREATE OR REPLACE FUNCTION current_guest_id() RETURNS INT AS $$
+DECLARE
+    val TEXT;
+BEGIN
+    val := current_setting('app.current_guest_id', true);
+    IF val = '' OR val IS NULL THEN
+        RETURN NULL;
+    END IF;
+    RETURN val::INT;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Enable RLS on Tenant Tables
+ALTER TABLE Branch ENABLE ROW LEVEL SECURITY;
+ALTER TABLE Employee ENABLE ROW LEVEL SECURITY;
+ALTER TABLE Room ENABLE ROW LEVEL SECURITY;
+ALTER TABLE Reservation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ReservationRoom ENABLE ROW LEVEL SECURITY;
+ALTER TABLE Invoice ENABLE ROW LEVEL SECURITY;
+ALTER TABLE Payment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE RoomTask ENABLE ROW LEVEL SECURITY;
+ALTER TABLE FacilityTask ENABLE ROW LEVEL SECURITY;
+ALTER TABLE RoomMaintenance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE FacilityMaintenance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE FacilityBooking ENABLE ROW LEVEL SECURITY;
+
+-- FORCE RLS so it applies even to table owners (unless BYPASSRLS is used)
+ALTER TABLE Branch FORCE ROW LEVEL SECURITY;
+ALTER TABLE Employee FORCE ROW LEVEL SECURITY;
+ALTER TABLE Room FORCE ROW LEVEL SECURITY;
+ALTER TABLE Reservation FORCE ROW LEVEL SECURITY;
+ALTER TABLE ReservationRoom FORCE ROW LEVEL SECURITY;
+ALTER TABLE Invoice FORCE ROW LEVEL SECURITY;
+ALTER TABLE Payment FORCE ROW LEVEL SECURITY;
+ALTER TABLE RoomTask FORCE ROW LEVEL SECURITY;
+ALTER TABLE FacilityTask FORCE ROW LEVEL SECURITY;
+ALTER TABLE RoomMaintenance FORCE ROW LEVEL SECURITY;
+ALTER TABLE FacilityMaintenance FORCE ROW LEVEL SECURITY;
+ALTER TABLE FacilityBooking FORCE ROW LEVEL SECURITY;
+
+-- -----------------------------------------------------------------------
+-- Policies
+-- -----------------------------------------------------------------------
+
+-- Branch: Employees can see their own branch, Super Admins can see all
+CREATE POLICY branch_isolation ON Branch FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);
+
+-- Employee: Employees can see/manage employees in their own branch
+CREATE POLICY employee_isolation ON Employee FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);
+
+-- Room: Isolated by branch_id
+CREATE POLICY room_isolation ON Room FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);
+
+-- Reservation: Isolated by branch_id for staff, or guest_id for guests
+CREATE POLICY reservation_isolation ON Reservation FOR ALL USING (
+    is_super_admin() 
+    OR branch_id = current_branch_id() 
+    OR guest_id = current_guest_id()
+);
+
+-- ReservationRoom: Inherits from Reservation
+CREATE POLICY reservation_room_isolation ON ReservationRoom FOR ALL USING (
+    is_super_admin() 
+    OR EXISTS (
+        SELECT 1 FROM Reservation r 
+        WHERE r.reservation_id = ReservationRoom.reservation_id 
+        AND (r.branch_id = current_branch_id() OR r.guest_id = current_guest_id())
+    )
+);
+
+-- Invoice: Inherits from Reservation
+CREATE POLICY invoice_isolation ON Invoice FOR ALL USING (
+    is_super_admin() 
+    OR EXISTS (
+        SELECT 1 FROM Reservation r 
+        WHERE r.reservation_id = Invoice.reservation_id 
+        AND (r.branch_id = current_branch_id() OR r.guest_id = current_guest_id())
+    )
+);
+
+-- Payment: Inherits from Invoice -> Reservation
+CREATE POLICY payment_isolation ON Payment FOR ALL USING (
+    is_super_admin() 
+    OR EXISTS (
+        SELECT 1 FROM Invoice i 
+        JOIN Reservation r ON i.reservation_id = r.reservation_id
+        WHERE i.invoice_id = Payment.invoice_id 
+        AND (r.branch_id = current_branch_id() OR r.guest_id = current_guest_id())
+    )
+);
+
+-- Tasks & Maintenance: Isolated by branch_id
+CREATE POLICY room_task_isolation ON RoomTask FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);
+CREATE POLICY facility_task_isolation ON FacilityTask FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);
+CREATE POLICY room_maintenance_isolation ON RoomMaintenance FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);
+CREATE POLICY facility_maintenance_isolation ON FacilityMaintenance FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);
+CREATE POLICY facility_booking_isolation ON FacilityBooking FOR ALL USING (
+    is_super_admin() OR branch_id = current_branch_id()
+);

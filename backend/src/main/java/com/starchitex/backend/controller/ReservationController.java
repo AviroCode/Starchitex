@@ -39,7 +39,7 @@ public class ReservationController {
         return reservationService.getReservationsByGuestId(guestId);
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or #reservation.branchId() == authentication.principal.branchId")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createReservation(@RequestBody Reservation reservation) {
         boolean isCreated = reservationService.createReservation(reservation);

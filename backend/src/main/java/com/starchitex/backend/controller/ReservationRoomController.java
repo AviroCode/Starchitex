@@ -39,7 +39,7 @@ public class ReservationRoomController {
         return reservationRoomService.getReservationIdsByRoomId(roomId);
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or @reservationRoomController.isAuthorizedBranch(#reservationRoom.reservationId(), authentication.principal.branchId)")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> assignRoomToReservation(@RequestBody ReservationRoom reservationRoom) {
         try {
@@ -54,10 +54,6 @@ public class ReservationRoomController {
         }
     }
 
-    public boolean isAuthorizedBranch(int reservationId, Integer userBranchId) {
-        Optional<Reservation> res = reservationService.getReservationById(reservationId);
-        return res.isPresent() && res.get().branchId().equals(userBranchId);
-    }
 
     @DeleteMapping("/reservation/{reservationId}/room/{roomId}")
     public ResponseEntity<String> removeRoomFromReservation(@PathVariable int reservationId, @PathVariable int roomId) {
