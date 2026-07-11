@@ -15,7 +15,7 @@ export default function LoginPage() {
     setBusy(true)
     setError(null)
     try {
-      const jwt = await api.login(username, password)
+      const jwt = await api.login(username.trim(), password.trim())
       login(jwt, username)
     } catch (err) {
       setError(err.message || 'Wrong username or password.')
