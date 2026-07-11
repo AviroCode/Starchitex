@@ -5,4 +5,5 @@ target/
 .idea/
 .vscode/
 backend/src/main/resources/db_security_grants.sql
+AGENTS.md
 *.md

@@ -1,0 +1,169 @@
+/* Starchitex Front Desk — navy ink, registry paper, key-tag brass. */
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --ink: #1b2a41;
+  --ink-2: #24374f;
+  --paper: #faf7f2;
+  --brass: #a87e2f;
+  --brass-soft: #e8dcc0;
+  --sage: #3e7c6b;
+  --alert: #b3402a;
+  --line: #d9d2c4;
+  font-size: 16px;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink); background: var(--paper); }
+
+/* ---------- shell ---------- */
+.shell { display: flex; min-height: 100vh; }
+.content { flex: 1; display: flex; flex-direction: column; padding: 1.5rem 2rem 0; min-width: 0; }
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--ink); color: var(--paper);
+  display: flex; flex-direction: column;
+  padding: 1.4rem 1rem 1rem;
+  border-right: 3px double var(--brass);
+}
+.brand h1 {
+  font-family: 'Marcellus', serif; font-size: 1.35rem; margin: 0;
+  letter-spacing: 0.14em; text-transform: uppercase;
+}
+.tagline { margin: 0.15rem 0 0; color: var(--brass-soft); font-size: 0.66rem; letter-spacing: 0.26em; text-transform: uppercase; }
+.tagline.dark { color: #8a8271; }
+.sidebar nav { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.nav-item {
+  text-align: left; font: inherit; font-size: 0.9rem; letter-spacing: 0.04em;
+  background: none; border: none; color: var(--brass-soft);
+  padding: 0.6rem 0.75rem; border-left: 3px solid transparent; cursor: pointer;
+}
+.nav-item:hover { color: var(--paper); }
+.nav-item.active { color: var(--paper); border-left-color: var(--brass); background: rgba(255,255,255,0.05); }
+.nav-item:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.78rem; }
+.whoami { color: var(--brass-soft); font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; }
+.link-btn {
+  background: none; border: 1px solid var(--brass); color: var(--brass-soft);
+  border-radius: 2px; padding: 0.35rem 0.7rem; cursor: pointer; font: inherit; font-size: 0.75rem;
+}
+.link-btn:hover { color: var(--paper); }
+
+/* ---------- pages ---------- */
+.page { display: flex; flex-direction: column; gap: 1rem; }
+.page-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.page-head h2 {
+  font-family: 'Marcellus', serif; font-weight: 400; font-size: 1.3rem;
+  letter-spacing: 0.08em; text-transform: uppercase; margin: 0;
+  border-bottom: 3px double var(--brass); padding-bottom: 0.35rem;
+}
+.two-col { display: grid; grid-template-columns: 340px 1fr; gap: 1.25rem; align-items: start; }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 1.1rem 1.25rem 1.35rem; }
+.panel-grow { min-width: 0; }
+.panel h3 {
+  font-family: 'Marcellus', serif; font-weight: 400; font-size: 0.95rem;
+  letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.9rem;
+  padding-bottom: 0.5rem; border-bottom: 1px solid var(--line);
+}
+.panel h4 { font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: #6b6455; margin: 1rem 0 0.4rem; }
+
+/* ---------- key rack (signature) ---------- */
+.key-rack { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 0.7rem; }
+.key-tag {
+  border: 1px solid var(--line); border-top: 5px solid var(--brass);
+  border-radius: 3px 3px 8px 8px; padding: 0.55rem 0.6rem 0.5rem;
+  background: linear-gradient(180deg, #fffdf8, #f4efe4);
+  display: flex; flex-direction: column; gap: 0.15rem; position: relative;
+}
+.key-tag::before {
+  content: ""; position: absolute; top: -3px; left: 50%; transform: translate(-50%, -50%);
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--paper); border: 2px solid var(--brass);
+}
+.room-no { font-family: 'IBM Plex Mono', monospace; font-size: 1.15rem; font-weight: 500; }
+.floor { font-size: 0.68rem; color: #6b6455; letter-spacing: 0.05em; }
+.rtype { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--brass); margin-top: 0.15rem; }
+
+/* ---------- forms ---------- */
+.res-form { display: flex; flex-direction: column; gap: 0.8rem; }
+.res-form label, .login-card label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; letter-spacing: 0.03em; color: #5a5344; }
+.res-form input, .res-form select, .login-card input {
+  font: inherit; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 3px; background: var(--paper);
+  min-width: 0;
+}
+.res-form input:focus-visible, .res-form select:focus-visible, .login-card input:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+.res-form button, .login-card button[type="submit"] {
+  margin-top: 0.4rem; font: inherit; font-weight: 600; letter-spacing: 0.06em;
+  padding: 0.65rem; border: none; border-radius: 3px; background: var(--ink); color: var(--paper); cursor: pointer;
+}
+.res-form button:hover, .login-card button[type="submit"]:hover { background: var(--ink-2); }
+.res-form button:disabled { opacity: 0.6; cursor: default; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+
+/* ---------- tables ---------- */
+.res-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.res-table th {
+  text-align: left; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #6b6455; padding: 0.4rem 0.6rem; border-bottom: 2px solid var(--line);
+}
+.res-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); }
+.row-active td { background: #f8f4ea; }
+.mono { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
+.dim { color: #8a8271; }
+.actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.mini-btn {
+  font: inherit; font-size: 0.72rem; letter-spacing: 0.04em;
+  padding: 0.25rem 0.55rem; border: 1px solid var(--brass); border-radius: 2px;
+  background: none; color: var(--ink); cursor: pointer; white-space: nowrap;
+}
+.mini-btn:hover { background: var(--brass-soft); }
+
+/* ---------- status badges ---------- */
+.status { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 2px; white-space: nowrap; }
+.status-pending       { background: var(--brass-soft); color: #6b5312; }
+.status-confirmed     { background: #e2ede8; color: var(--sage); }
+.status-checkedin     { background: var(--ink); color: var(--paper); }
+.status-checkedout    { background: #eee9de; color: #6b6455; }
+.status-cancelled     { background: #f6e3de; color: var(--alert); }
+.status-paid          { background: #e2ede8; color: var(--sage); }
+.status-partiallypaid { background: var(--brass-soft); color: #6b5312; }
+
+/* ---------- banners ---------- */
+.banner { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.7rem 1rem; border-radius: 3px; font-size: 0.88rem; }
+.banner-ok    { background: #e2ede8; border-left: 4px solid var(--sage); }
+.banner-error { background: #f6e3de; border-left: 4px solid var(--alert); }
+.banner-x { background: none; border: none; font-size: 1rem; cursor: pointer; color: inherit; }
+
+/* ---------- billing folio ---------- */
+.folio dl { margin: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.folio dl > div { display: flex; justify-content: space-between; font-size: 0.86rem; }
+.folio dt { color: #6b6455; }
+.folio dd { margin: 0; }
+.folio-total { border-top: 2px solid var(--line); padding-top: 0.4rem; font-weight: 600; }
+.pay-row { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.82rem; padding: 0.35rem 0; border-bottom: 1px dashed var(--line); }
+
+/* ---------- login ---------- */
+.login-wrap { min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; background: var(--paper); }
+.login-card { width: 340px; display: flex; flex-direction: column; gap: 0.8rem; margin-top: 15vh; }
+.login-brand { font-family: 'Marcellus', serif; letter-spacing: 0.12em; text-transform: uppercase; margin: 0; font-size: 1.6rem; }
+.hint { font-size: 0.72rem; color: #8a8271; margin: 0.2rem 0 0; }
+.empty { color: #8a8271; font-size: 0.85rem; }
+.foot {
+  margin-top: auto; padding: 0.9rem 0;
+  font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #8a8271; border-top: 1px solid var(--line);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 900px) {
+  .shell { flex-direction: column; }
+  .sidebar { width: 100%; flex-direction: row; align-items: center; gap: 1rem; padding: 0.8rem 1rem; }
+  .sidebar nav { margin-top: 0; flex-direction: row; }
+  .sidebar-foot { margin-top: 0; margin-left: auto; flex-direction: row; align-items: center; }
+  .two-col { grid-template-columns: 1fr; }
+  .content { padding: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

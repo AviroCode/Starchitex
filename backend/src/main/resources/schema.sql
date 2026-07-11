@@ -376,3 +376,44 @@ FROM Invoice
 WHERE status = 'PAID'
 GROUP BY EXTRACT(YEAR FROM invoice_date), EXTRACT(MONTH FROM invoice_date)
 ORDER BY invoice_year DESC, invoice_month DESC;
+
+-- Status constraints 
+ALTER TABLE Branch ADD CONSTRAINT chk_branch_status CHECK (status IN ('ACTIVE', 'INACTIVE'));
+
+-- Enforce valid Employee employment statuses
+ALTER TABLE Employee ADD CONSTRAINT chk_employee_status 
+CHECK (employment_status IN ('ACTIVE', 'TERMINATED', 'ON_LEAVE'));
+
+-- Enforce valid RoomAvailability status
+ALTER TABLE RoomAvailability ADD CONSTRAINT chk_room_availability_status 
+CHECK (status IN ('AVAILABLE', 'OCCUPIED', 'MAINTENANCE'));
+
+-- Enforce valid Reservation status
+ALTER TABLE Reservation ADD CONSTRAINT chk_reservation_status 
+CHECK (status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'));
+
+-- Enforce valid ReservationStatusLog status
+ALTER TABLE ReservationStatusLog ADD CONSTRAINT chk_reservation_status_log_status 
+CHECK (status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'));
+
+-- Enforce valid Invoice status
+ALTER TABLE Invoice ADD CONSTRAINT chk_invoice_status 
+CHECK (status IN ('UNPAID', 'PAID', 'REFUNDED'));
+
+-- Enforce valid ServiceRequest status
+ALTER TABLE ServiceRequest ADD CONSTRAINT chk_service_request_status 
+CHECK (status IN ('PENDING', 'COMPLETED', 'CANCELLED'));
+
+-- Enforce valid RoomTask and FacilityTask statuses
+ALTER TABLE RoomTask ADD CONSTRAINT chk_room_task_status 
+CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED'));
+
+ALTER TABLE FacilityTask ADD CONSTRAINT chk_facility_task_status 
+CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED'));
+
+-- Enforce valid RoomMaintenance and FacilityMaintenance statuses
+ALTER TABLE RoomMaintenance ADD CONSTRAINT chk_room_maintenance_status 
+CHECK (status IN ('REPORTED', 'IN_PROGRESS', 'RESOLVED'));
+
+ALTER TABLE FacilityMaintenance ADD CONSTRAINT chk_facility_maintenance_status 
+CHECK (status IN ('REPORTED', 'IN_PROGRESS', 'RESOLVED'));
