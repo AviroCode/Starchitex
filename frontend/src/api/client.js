@@ -22,9 +22,14 @@ async function request(path, options = {}) {
       ...(options.headers || {}),
     },
   })
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
     onUnauthorized()
     throw new ApiError('Session expired — please sign in again.', res.status)
+  }
+  if (res.status === 403) {
+    // Authorization (not authentication) failure — this user lacks permission
+    // for this endpoint. Do NOT log out; surface an empty/error result instead.
+    throw new ApiError('Not permitted for this account.', 403)
   }
   if (!res.ok) {
     // Constraint violations arrive as a bare 500 with no useful body (§4) —

@@ -19,7 +19,12 @@ export default function ReservationsPage({ guests }) {
   const [numGuests, setNumGuests] = useState(1)
   const [saving, setSaving] = useState(false)
 
-  const load = () => api.reservations().then(setReservations).catch((e) => setError(e.message))
+  const load = () => api.reservations()
+    .then(setReservations)
+    .catch((e) => {
+      if (e.status === 403) setError('This account is not permitted to view reservations (RBAC). Try an admin/manager login.')
+      else setError(e.message)
+    })
   useEffect(() => { load() }, [])
 
   const guestName = (id) => {
