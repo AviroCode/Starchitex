@@ -1,5 +1,7 @@
 # Stage 1: build the static assets
-FROM node:20-alpine AS builder
+# (node:20-slim, not -alpine: some Docker Desktop/Apple Silicon combinations
+# hit a segfault in `npm ci` under alpine's musl libc + V8 JIT)
+FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

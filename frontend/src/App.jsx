@@ -45,7 +45,7 @@ function Shell() {
         {page === 'reservations' && <ReservationsPage guests={guests} />}
         {page === 'guests' && <GuestsPage guests={guests} refreshGuests={refreshGuests} />}
         {page === 'billing' && <BillingPage guests={guests} />}
-        <footer className="foot">Live against PostgreSQL on Render · constraints enforced at the database layer</footer>
+        <footer className="foot">Live against PostgreSQL · constraints enforced at the database layer</footer>
       </main>
     </div>
   )

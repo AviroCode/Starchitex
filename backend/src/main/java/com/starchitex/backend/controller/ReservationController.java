@@ -18,7 +18,7 @@ public class ReservationController {
         this.reservationService = reservationService;
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive')")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @GetMapping
     public List<Reservation> getAllReservations() {
         return reservationService.getAllReservations();
