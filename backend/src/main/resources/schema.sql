@@ -270,6 +270,7 @@ CREATE TABLE IF NOT EXISTS Payment (
     transaction_ref VARCHAR(255)
 );
 ALTER TABLE Payment ADD CONSTRAINT chk_payment_method CHECK (payment_method IN ('Cash', 'Credit Card', 'Debit Card', 'Bank Transfer', 'Digital Wallet', 'Other'));
+ALTER TABLE Payment ADD CONSTRAINT chk_payment_amount CHECK (amount > 0);
 
 -- 6. Triggers and Functions (PL/pgSQL)
 
@@ -435,8 +436,12 @@ DECLARE
     v_total_amount DECIMAL(10, 2);
     TAX_RATE CONSTANT DECIMAL(10, 2) := 0.07; -- 7% Tax
 BEGIN
-    -- 1. Calculate the sub_total from all associated InvoiceItems
-    SELECT COALESCE(SUM(quantity * amount), 0) INTO v_sub_total
+    -- 1. Calculate the sub_total from all associated InvoiceItems.
+    -- `amount` is already the line total (enforce_invoice_item_price sets it
+    -- to unit_price * quantity for Room/Service items), so summing plain
+    -- `amount` is correct; `SUM(quantity * amount)` would double-count
+    -- quantity for any line with quantity > 1.
+    SELECT COALESCE(SUM(amount), 0) INTO v_sub_total
     FROM InvoiceItem
     WHERE invoice_id = p_invoice_id;
 

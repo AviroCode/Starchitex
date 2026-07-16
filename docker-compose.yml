@@ -7,11 +7,16 @@ services:
     environment:
       POSTGRES_DB: starchitex
       POSTGRES_USER: starchitex_user
-      POSTGRES_PASSWORD: local_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
       - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # Self-initializes a fresh container: schema first, seed data second
+      # (docker-entrypoint-initdb.d runs *.sql in alphabetical order, and only
+      # on an empty data directory).
+      - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/seed/seed_data.sql:/docker-entrypoint-initdb.d/02_seed_data.sql:ro
 
   backend:
     build:
@@ -21,10 +26,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # These variables override your application.properties variables for local development!
+      # These variables override application.properties for local development.
       - DB_URL=jdbc:postgresql://db:5432/starchitex
       - DB_USERNAME=starchitex_user
-      - DB_PASSWORD=local_password
+      - DB_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env}
     depends_on:
       - db
 

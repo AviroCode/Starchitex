@@ -3,6 +3,7 @@ package com.starchitex.backend.controller;
 import com.starchitex.backend.model.Role;
 import com.starchitex.backend.service.RoleService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,6 +30,7 @@ public class RoleController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator')")
     @PostMapping
     public ResponseEntity<String> createRole(@RequestBody Role role) {
         boolean isCreated = roleService.createRole(role);
@@ -39,6 +41,7 @@ public class RoleController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator')")
     @PutMapping("/{id}")
     public ResponseEntity<String> updateRole(@PathVariable int id, @RequestBody Role role) {
         Role roleToUpdate = new Role(

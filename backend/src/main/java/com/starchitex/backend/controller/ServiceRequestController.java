@@ -3,6 +3,7 @@ package com.starchitex.backend.controller;
 import com.starchitex.backend.model.ServiceRequest;
 import com.starchitex.backend.service.ServiceRequestService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,6 +35,7 @@ public class ServiceRequestController {
         return serviceRequestService.getServiceRequestsByReservationId(reservationId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createServiceRequest(@RequestBody ServiceRequest request) {
         boolean isCreated = serviceRequestService.createServiceRequest(request);
@@ -44,6 +46,7 @@ public class ServiceRequestController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PutMapping("/{requestId}")
     public ResponseEntity<String> updateServiceRequest(@PathVariable int requestId, @RequestBody ServiceRequest request) {
         ServiceRequest requestToUpdate = new ServiceRequest(
