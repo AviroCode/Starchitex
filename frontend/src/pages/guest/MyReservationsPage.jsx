@@ -13,11 +13,13 @@ export default function MyReservationsPage({ guestId }) {
   const load = () => api.reservationsByGuest(guestId).then(setReservations).catch((e) => setError(e.message))
   useEffect(() => { load() }, [guestId])
 
+  // Check-in/check-out happen in person at the front desk, not self-service —
+  // a guest can book and cancel their own reservation, but not check
+  // themselves in or out.
   const actionsFor = (r) => {
     switch (r.status) {
-      case 'Pending':    return [['Cancel', api.cancelReservation, 'cancelled']]
-      case 'Confirmed':  return [['Check in', api.checkInReservation, 'checked in'], ['Cancel', api.cancelReservation, 'cancelled']]
-      case 'Checked In': return [['Check out', api.checkOutReservation, 'checked out']]
+      case 'Pending':
+      case 'Confirmed':  return [['Cancel', api.cancelReservation, 'cancelled']]
       default:           return []
     }
   }

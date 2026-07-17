@@ -164,7 +164,6 @@ function Shell() {
 
           <Route path="*" element={<Navigate to={isGuest ? GUEST_HOME : STAFF_HOME} replace />} />
         </Routes>
-        <footer className="foot">Live against PostgreSQL · constraints enforced at the database layer</footer>
       </main>
     </div>
   )

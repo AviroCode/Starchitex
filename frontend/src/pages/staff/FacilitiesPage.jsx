@@ -3,7 +3,16 @@ import { api } from '../../api/client.js'
 import Banner from '../../components/Banner.jsx'
 import BranchPicker from '../../components/BranchPicker.jsx'
 
+// Local wall-clock time formatted for a <input type="datetime-local"> min attribute.
+const nowLocal = () => {
+  const d = new Date()
+  d.setSeconds(0, 0)
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 16)
+}
+
 export default function FacilitiesPage({ branches, branchId, setBranchId }) {
+  const [minStart] = useState(nowLocal())
   const [facilities, setFacilities] = useState([])
   const [reservations, setReservations] = useState([])
   const [error, setError] = useState(null)
@@ -41,6 +50,8 @@ export default function FacilitiesPage({ branches, branchId, setBranchId }) {
 
   const book = async (e) => {
     e.preventDefault()
+    if (start < minStart) { setError('Start time can\'t be in the past.'); return }
+    if (end <= start) { setError('End time must be after the start time.'); return }
     setError(null); setNotice(null)
     try {
       await api.createFacilityBooking({
@@ -87,8 +98,14 @@ export default function FacilitiesPage({ branches, branchId, setBranchId }) {
                     {reservations.map((r) => <option key={r.reservationId} value={r.reservationId}>#{r.reservationId} — {r.status}</option>)}
                   </select>
                 </label>
-                <label>Start<input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} required /></label>
-                <label>End<input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} required /></label>
+                <label>Start
+                  <input type="datetime-local" min={minStart} value={start}
+                    onChange={(e) => {
+                      setStart(e.target.value)
+                      if (end && end <= e.target.value) setEnd('')
+                    }} required />
+                </label>
+                <label>End<input type="datetime-local" min={start || minStart} value={end} onChange={(e) => setEnd(e.target.value)} required /></label>
                 <button type="submit">Confirm booking</button>
               </form>
             </>

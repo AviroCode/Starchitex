@@ -7,7 +7,14 @@ import StatusBadge from '../components/StatusBadge.jsx'
 const REJECTION_HINT =
   'The database rejected this — likely check-out is not after check-in, or a required field is invalid.'
 
+// Local calendar date (not UTC) so "today" matches what the date picker shows.
+const todayISO = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export default function ReservationsPage({ guests, branchId }) {
+  const today = todayISO()
   const [reservations, setReservations] = useState([])
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
@@ -29,6 +36,8 @@ export default function ReservationsPage({ guests, branchId }) {
 
   const create = async (e) => {
     e.preventDefault()
+    if (checkIn < today) { setError('Check-in date can\'t be in the past.'); return }
+    if (checkOut <= checkIn) { setError('Check-out date must be after check-in.'); return }
     setSaving(true); setError(null); setNotice(null)
     try {
       await api.createReservation({
@@ -105,10 +114,14 @@ export default function ReservationsPage({ guests, branchId }) {
               </select>
             </label>
             <label>Check-in
-              <input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} required />
+              <input type="date" min={today} value={checkIn}
+                onChange={(e) => {
+                  setCheckIn(e.target.value)
+                  if (checkOut && checkOut <= e.target.value) setCheckOut('')
+                }} required />
             </label>
             <label>Check-out
-              <input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required />
+              <input type="date" min={checkIn || today} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required />
             </label>
             <label>Guests
               <input type="number" min="1" value={numGuests} onChange={(e) => setNumGuests(e.target.value)} required />

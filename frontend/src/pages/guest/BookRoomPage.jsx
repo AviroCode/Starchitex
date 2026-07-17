@@ -7,7 +7,15 @@ import PhotoPlaceholder from '../../components/PhotoPlaceholder.jsx'
 const REJECTION_HINT =
   'The database rejected this — likely check-out is not after check-in, or that room is already booked for those dates.'
 
+// Local calendar date (not UTC) so "today" matches what the date picker
+// shows the guest, regardless of timezone offset.
+const todayISO = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export default function BookRoomPage({ branches, guestId }) {
+  const today = todayISO()
   const [branchId, setBranchId] = useState(branches[0]?.branchId ?? null)
   const [rooms, setRooms] = useState([])
   const [types, setTypes] = useState([])
@@ -36,6 +44,8 @@ export default function BookRoomPage({ branches, guestId }) {
 
   const book = async (room) => {
     if (!checkIn || !checkOut) { setError('Pick check-in and check-out dates first.'); return }
+    if (checkIn < today) { setError('Check-in date can\'t be in the past.'); return }
+    if (checkOut <= checkIn) { setError('Check-out date must be after check-in.'); return }
     setError(null); setNotice(null); setBooking(room.roomId)
     try {
       await api.createReservation({
@@ -79,8 +89,14 @@ export default function BookRoomPage({ branches, guestId }) {
         <h3>Your stay</h3>
         <form className="res-form" onSubmit={(e) => e.preventDefault()}>
           <div className="pair">
-            <label>Check-in<input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} required /></label>
-            <label>Check-out<input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required /></label>
+            <label>Check-in
+              <input type="date" min={today} value={checkIn}
+                onChange={(e) => {
+                  setCheckIn(e.target.value)
+                  if (checkOut && checkOut <= e.target.value) setCheckOut('')
+                }} required />
+            </label>
+            <label>Check-out<input type="date" min={checkIn || today} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required /></label>
           </div>
           <label>Guests<input type="number" min="1" value={numGuests} onChange={(e) => setNumGuests(e.target.value)} required /></label>
         </form>
