@@ -51,5 +51,12 @@ public class InvoiceController {
         }
     }
 
-    
+    // Records that staff processed a refund outside the app (cash, bank
+    // transfer, reversing a card charge, etc.) — see InvoiceRepository.markRefunded.
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PostMapping("/{invoiceId}/mark-refunded")
+    public ResponseEntity<String> markRefunded(@PathVariable int invoiceId) {
+        boolean success = invoiceService.markRefunded(invoiceId);
+        return success ? ResponseEntity.ok("Invoice marked as refunded.") : ResponseEntity.badRequest().body("Failed to mark invoice as refunded.");
+    }
 }

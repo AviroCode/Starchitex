@@ -60,6 +60,7 @@ export const api = {
   updateGuest: (id, g) => request(`/api/guests/${id}`, { method: 'PUT', body: JSON.stringify(g) }),
 
   roomsByBranch: (branchId) => request(`/api/rooms/branch/${branchId}`),
+  createRoom: (r) => request('/api/rooms', { method: 'POST', body: JSON.stringify(r) }),
   roomTypes: () => request('/api/room-types'),                       // kebab-case (§3)
   createRoomType: (rt) => request('/api/room-types', { method: 'POST', body: JSON.stringify(rt) }),
   updateRoomType: (id, rt) => request(`/api/room-types/${id}`, { method: 'PUT', body: JSON.stringify(rt) }),
@@ -72,6 +73,7 @@ export const api = {
   reservations: () => request('/api/reservations'),
   reservationsByGuest: (guestId) => request(`/api/reservations/guest/${guestId}`),
   createReservation: (r) => request('/api/reservations', { method: 'POST', body: JSON.stringify(r) }),
+  bookRoom: (payload) => request('/api/reservations/book', { method: 'POST', body: JSON.stringify(payload) }),
   updateReservation: (id, r) => request(`/api/reservations/${id}`, { method: 'PUT', body: JSON.stringify(r) }),
   confirmReservation: (id) => request(`/api/reservations/${id}/confirm`, { method: 'POST' }),
   checkInReservation: (id) => request(`/api/reservations/${id}/check-in`, { method: 'POST' }),
@@ -85,6 +87,7 @@ export const api = {
   invoices: () => request('/api/invoices'),
   invoicesByGuest: (guestId) => request(`/api/invoices/guest/${guestId}`),
   createInvoice: (inv) => request('/api/invoices', { method: 'POST', body: JSON.stringify(inv) }),
+  markInvoiceRefunded: (id) => request(`/api/invoices/${id}/mark-refunded`, { method: 'POST' }),
   invoiceItemsByInvoice: (invoiceId) => request(`/api/invoice-items/invoice/${invoiceId}`),
   createInvoiceItem: (item) => request('/api/invoice-items', { method: 'POST', body: JSON.stringify(item) }),
   paymentsByInvoice: (invoiceId) => request(`/api/payments/invoice/${invoiceId}`),
@@ -128,4 +131,7 @@ export const api = {
   auditLogs: () => request('/api/audit-logs'),
   auditLogsByEmployee: (employeeId) => request(`/api/audit-logs/employee/${employeeId}`),
   auditLogsByTable: (tableName) => request(`/api/audit-logs/table/${tableName}`),
+
+  analyticsSummary: () => request('/api/analytics/summary'),
+  monthlyRevenue: () => request('/api/analytics/monthly-revenue'),
 }

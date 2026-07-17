@@ -16,6 +16,9 @@ DO $$
 DECLARE
   v_branch INT; v_rtype INT; v_room INT; v_guest INT; v_res INT;
   v_svc INT; v_req INT; v_inv INT;
+  v_svc_auto INT; v_req_auto INT;
+  v_res_cancel INT; v_inv_cancel INT; v_fee_amount NUMERIC;
+  v_res_early INT; v_inv_early INT;
   v_status TEXT; v_inv_status TEXT; v_paid NUMERIC;
 BEGIN
   -- ---------- SETUP ----------
@@ -85,6 +88,22 @@ BEGIN
   THEN RAISE NOTICE 'TEST 03-5: PASS — invoice items sum to sub_total';
   ELSE RAISE NOTICE 'TEST 03-5: FAIL — items do not sum to sub_total (got %)', (SELECT SUM(amount) FROM InvoiceItem WHERE invoice_id=v_inv); END IF;
 
+  -- ---------- STEP 5B: service request completed AFTER the invoice exists
+  -- auto-posts to the folio via trg_auto_post_completed_service_request.
+  -- Price is 0 deliberately, so it doesn't disturb the sub_total/tax/total
+  -- arithmetic the payment steps below depend on — only existence of the
+  -- auto-created InvoiceItem is being asserted here.
+  -- ----------
+  INSERT INTO Service (service_name, category, price) VALUES ('ZZTEST Auto-post Svc', 'Room Service', 0)
+  RETURNING service_id INTO v_svc_auto;
+  INSERT INTO ServiceRequest (reservation_id, service_id, description)
+  VALUES (v_res, v_svc_auto, 'ZZTEST auto-post after invoice exists') RETURNING request_id INTO v_req_auto;
+  UPDATE ServiceRequest SET status='Completed' WHERE request_id = v_req_auto;
+
+  IF EXISTS (SELECT 1 FROM InvoiceItem WHERE invoice_id=v_inv AND service_id=v_svc_auto AND item_type='Service')
+  THEN RAISE NOTICE 'TEST 03-5B: PASS — completed service request auto-posted an InvoiceItem';
+  ELSE RAISE NOTICE 'TEST 03-5B: FAIL — no InvoiceItem was auto-created'; END IF;
+
   -- ---------- STEP 6: partial payment ----------
   -- trg_update_invoice_status_on_payment recalculates Invoice.status
   -- automatically after each Payment insert/delete.
@@ -108,18 +127,61 @@ BEGIN
   THEN RAISE NOTICE 'TEST 03-8: PASS — checked out';
   ELSE RAISE NOTICE 'TEST 03-8: FAIL'; END IF;
 
+  -- ---------- STEP 9: cancelling within 24h of check-in posts a fee ----------
+  -- Separate reservation (v_res is already terminal/Checked Out and can't be
+  -- cancelled). check_in_date = CURRENT_DATE puts it inside
+  -- enforce_cancellation_policy's window (check_in_date - CURRENT_DATE <= 1).
+  INSERT INTO Reservation (branch_id, guest_id, check_in_date, check_out_date, num_of_guests)
+  VALUES (v_branch, v_guest, CURRENT_DATE, CURRENT_DATE + 2, 1) RETURNING reservation_id INTO v_res_cancel;
+  INSERT INTO ReservationRoom VALUES (v_res_cancel, v_room);
+  UPDATE Reservation SET status='Confirmed' WHERE reservation_id=v_res_cancel;
+
+  INSERT INTO Invoice (reservation_id, payer_guest_id, sub_total, tax_amount, discount, total_amount)
+  VALUES (v_res_cancel, v_guest, 0, 0, 0, 0) RETURNING invoice_id INTO v_inv_cancel;
+  INSERT INTO InvoiceItem (invoice_id, room_id, item_type, quantity, amount) VALUES (v_inv_cancel, v_room, 'Room', 2, 0);
+
+  UPDATE Reservation SET status='Cancelled' WHERE reservation_id=v_res_cancel;
+
+  SELECT amount INTO v_fee_amount FROM InvoiceItem WHERE invoice_id=v_inv_cancel AND item_type='Fee';
+  -- v_rtype's base_price is 1500 (set up at the top of this test) — one
+  -- room, one night's rate.
+  IF v_fee_amount = 1500
+  THEN RAISE NOTICE 'TEST 03-9: PASS — cancelling within 24h of check-in posted a 1500 Fee item';
+  ELSE RAISE NOTICE 'TEST 03-9: FAIL — expected a 1500 Fee item, got %', v_fee_amount; END IF;
+
+  -- ---------- STEP 10: cancelling well before check-in adds no fee ----------
+  INSERT INTO Reservation (branch_id, guest_id, check_in_date, check_out_date, num_of_guests)
+  VALUES (v_branch, v_guest, CURRENT_DATE + 30, CURRENT_DATE + 32, 1) RETURNING reservation_id INTO v_res_early;
+  INSERT INTO ReservationRoom VALUES (v_res_early, v_room);
+  UPDATE Reservation SET status='Confirmed' WHERE reservation_id=v_res_early;
+
+  INSERT INTO Invoice (reservation_id, payer_guest_id, sub_total, tax_amount, discount, total_amount)
+  VALUES (v_res_early, v_guest, 0, 0, 0, 0) RETURNING invoice_id INTO v_inv_early;
+  INSERT INTO InvoiceItem (invoice_id, room_id, item_type, quantity, amount) VALUES (v_inv_early, v_room, 'Room', 2, 0);
+
+  UPDATE Reservation SET status='Cancelled' WHERE reservation_id=v_res_early;
+
+  IF NOT EXISTS (SELECT 1 FROM InvoiceItem WHERE invoice_id=v_inv_early AND item_type='Fee')
+  THEN RAISE NOTICE 'TEST 03-10: PASS — cancelling 30 days out adds no fee';
+  ELSE RAISE NOTICE 'TEST 03-10: FAIL — a fee was posted for an early cancellation'; END IF;
 
   -- ---------- CLEANUP ----------
   DELETE FROM Payment WHERE invoice_id=v_inv;
-  DELETE FROM InvoiceItem WHERE invoice_id=v_inv;
-  DELETE FROM Invoice WHERE invoice_id=v_inv;
+  DELETE FROM InvoiceItem WHERE invoice_id IN (v_inv, v_inv_cancel, v_inv_early);
+  DELETE FROM Invoice WHERE invoice_id IN (v_inv, v_inv_cancel, v_inv_early);
   DELETE FROM ServiceRequest WHERE request_id=v_req;
+  DELETE FROM ServiceRequest WHERE request_id=v_req_auto;
   DELETE FROM Service WHERE service_id=v_svc;
-  DELETE FROM ReservationRoom WHERE reservation_id=v_res;
-  -- trg_sync_room_availability populated RoomAvailability for this stay; it
-  -- must go before Room, which the availability rows still reference.
+  DELETE FROM Service WHERE service_id=v_svc_auto;
+  DELETE FROM ReservationRoom WHERE reservation_id IN (v_res, v_res_cancel, v_res_early);
+  -- trg_mark_room_dirty_on_checkout (fired by STEP 8's checkout) auto-created
+  -- a "Post-checkout cleaning" RoomTask; it must go before Room, which it
+  -- still references.
+  DELETE FROM RoomTask WHERE room_id=v_room;
+  -- trg_sync_room_availability populated RoomAvailability for these stays;
+  -- it must go before Room, which the availability rows still reference.
   DELETE FROM RoomAvailability WHERE room_id=v_room;
-  DELETE FROM Reservation WHERE reservation_id=v_res;
+  DELETE FROM Reservation WHERE reservation_id IN (v_res, v_res_cancel, v_res_early);
   DELETE FROM Room WHERE room_id=v_room;
   DELETE FROM RoomType WHERE room_type_id=v_rtype;
   DELETE FROM Guest WHERE guest_id=v_guest;

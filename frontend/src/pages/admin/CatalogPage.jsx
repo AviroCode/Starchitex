@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client.js'
 import Banner from '../../components/Banner.jsx'
+import BranchPicker from '../../components/BranchPicker.jsx'
 
-export default function CatalogPage() {
+export default function CatalogPage({ branches }) {
   const [types, setTypes] = useState([])
   const [services, setServices] = useState([])
+  const [rooms, setRooms] = useState([])
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
 
@@ -16,11 +18,21 @@ export default function CatalogPage() {
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState(100)
 
+  const [roomBranchId, setRoomBranchId] = useState(branches[0]?.branchId ?? null)
+  const [roomNumber, setRoomNumber] = useState('')
+  const [floor, setFloor] = useState(1)
+  const [roomTypeId, setRoomTypeId] = useState('')
+
   const loadAll = () => {
     api.roomTypes().then(setTypes).catch((e) => setError(e.message))
     api.services().then(setServices).catch((e) => setError(e.message))
   }
   useEffect(() => { loadAll() }, [])
+
+  useEffect(() => {
+    if (roomBranchId == null) return
+    api.roomsByBranch(roomBranchId).then(setRooms).catch((e) => setError(e.message))
+  }, [roomBranchId])
 
   const createType = async (e) => {
     e.preventDefault()
@@ -42,6 +54,22 @@ export default function CatalogPage() {
       setServiceName(''); setCategory(''); setPrice(100)
       loadAll()
     } catch { setError('Could not create the service.') }
+  }
+
+  const createRoom = async (e) => {
+    e.preventDefault()
+    setError(null); setNotice(null)
+    try {
+      await api.createRoom({
+        branchId: roomBranchId,
+        roomNumber,
+        floor: Number(floor),
+        roomTypeId: Number(roomTypeId),
+      })
+      setNotice(`Room ${roomNumber} added.`)
+      setRoomNumber(''); setFloor(1); setRoomTypeId('')
+      api.roomsByBranch(roomBranchId).then(setRooms)
+    } catch { setError('Could not create the room — that room number may already exist on this branch.') }
   }
 
   return (
@@ -68,6 +96,20 @@ export default function CatalogPage() {
             <label>Category<input value={category} onChange={(e) => setCategory(e.target.value)} required /></label>
             <label>Price<input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} required /></label>
             <button type="submit">Add service</button>
+          </form>
+
+          <h3 style={{ marginTop: '1.2rem' }}>New room</h3>
+          <form onSubmit={createRoom} className="res-form">
+            <label>Branch<BranchPicker branches={branches} value={roomBranchId} onChange={setRoomBranchId} /></label>
+            <label>Room number<input value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} required /></label>
+            <label>Floor<input type="number" min="0" value={floor} onChange={(e) => setFloor(e.target.value)} required /></label>
+            <label>Room type
+              <select value={roomTypeId} onChange={(e) => setRoomTypeId(e.target.value)} required>
+                <option value="" disabled>Choose a room type</option>
+                {types.map((t) => <option key={t.roomTypeId} value={t.roomTypeId}>{t.typeName}</option>)}
+              </select>
+            </label>
+            <button type="submit" disabled={!roomBranchId}>Add room</button>
           </form>
         </div>
 
@@ -97,6 +139,24 @@ export default function CatalogPage() {
                   <td className="mono">฿ {Number(s.price).toLocaleString()}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+
+          <h3 style={{ marginTop: '1.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span>Rooms</span>
+            <BranchPicker branches={branches} value={roomBranchId} onChange={setRoomBranchId} />
+          </h3>
+          <table className="res-table">
+            <thead><tr><th>Number</th><th>Floor</th><th>Type</th></tr></thead>
+            <tbody>
+              {rooms.map((r) => (
+                <tr key={r.roomId}>
+                  <td className="mono">{r.roomNumber}</td>
+                  <td className="mono">{r.floor}</td>
+                  <td>{types.find((t) => t.roomTypeId === r.roomTypeId)?.typeName ?? r.roomTypeId}</td>
+                </tr>
+              ))}
+              {rooms.length === 0 && <tr><td colSpan="3" className="empty">No rooms for this branch yet.</td></tr>}
             </tbody>
           </table>
         </div>

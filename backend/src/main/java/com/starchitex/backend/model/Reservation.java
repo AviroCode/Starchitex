@@ -13,5 +13,6 @@ public record Reservation(
     LocalDateTime actualCheckoutTime,
     LocalDateTime bookingDate,
     Integer numOfGuests,
-    String status
+    String status,
+    String specialRequests
 ) {}

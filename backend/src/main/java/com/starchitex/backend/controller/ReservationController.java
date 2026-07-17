@@ -1,5 +1,6 @@
 package com.starchitex.backend.controller;
 
+import com.starchitex.backend.model.BookingRequestDTO;
 import com.starchitex.backend.model.Reservation;
 import com.starchitex.backend.service.ReservationService;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +48,21 @@ public class ReservationController {
             return ResponseEntity.status(201).body("Reservation created successfully!");
         } else {
             return ResponseEntity.status(400).body("Failed to create reservation.");
+        }
+    }
+
+    // Atomic alternative to createReservation + a separate reservation-rooms
+    // POST: creates the reservation and attaches the room in one transaction,
+    // so a rejected room assignment (double-booked / maintenance-blocked)
+    // rolls back the reservation too instead of leaving an orphan Pending row.
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
+    @PostMapping("/book")
+    public ResponseEntity<String> bookRoom(@RequestBody BookingRequestDTO request) {
+        try {
+            boolean success = reservationService.bookRoom(request);
+            return success ? ResponseEntity.status(201).body("Room booked successfully!") : ResponseEntity.status(400).body("Failed to book room.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 

@@ -57,7 +57,8 @@ public class RoomController {
                 room.roomNumber(),
                 room.floor(),
                 room.branchId(),
-                room.roomTypeId()
+                room.roomTypeId(),
+                room.housekeepingStatus()
         );
 
         boolean isUpdated = roomService.updateRoom(roomToUpdate);

@@ -5,5 +5,6 @@ public record Room(
     String roomNumber,
     Integer floor,
     Integer branchId,
-    Integer roomTypeId
+    Integer roomTypeId,
+    String housekeepingStatus
 ) {}

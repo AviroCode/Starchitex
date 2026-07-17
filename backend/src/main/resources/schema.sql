@@ -77,6 +77,11 @@ CREATE TABLE IF NOT EXISTS Room (
     floor INT,
     branch_id INT NOT NULL REFERENCES Branch(branch_id),
     room_type_id INT NOT NULL REFERENCES RoomType(room_type_id),
+    -- Housekeeping cleanliness state — deliberately separate from
+    -- RoomAvailability.status, which tracks booking occupancy, not
+    -- cleanliness. "Out of service" is derived from open RoomMaintenance
+    -- tickets (see prevent_booking_maintenance_room below), not stored here.
+    housekeeping_status VARCHAR(20) NOT NULL DEFAULT 'Clean',
     UNIQUE (branch_id, room_number)
 );
 
@@ -125,7 +130,8 @@ CREATE TABLE IF NOT EXISTS Reservation (
     actual_checkout_time TIMESTAMP,
     booking_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     num_of_guests INT NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Pending'
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+    special_requests TEXT
 );
 
 CREATE TABLE IF NOT EXISTS AuditLog (
@@ -253,7 +259,7 @@ CREATE TABLE IF NOT EXISTS InvoiceItem (
     amount      DECIMAL(10, 2) NOT NULL,
     description TEXT,                                                  -- optional staff note (e.g. "broken TV")
     CONSTRAINT chk_invoiceitem_type CHECK (
-        item_type IN ('Room', 'Service', 'Damage', 'Maintenance', 'Other')
+        item_type IN ('Room', 'Service', 'Damage', 'Maintenance', 'Other', 'Fee')
     ),
     -- Exactly one of room_id / service_id must be set (or neither for 'Other')
     CONSTRAINT chk_invoiceitem_refs CHECK (
@@ -370,6 +376,39 @@ AFTER UPDATE OR DELETE ON ServiceRequest
 FOR EACH ROW EXECUTE FUNCTION log_service_request_audit();
 
 
+-- -----------------------------------------------------------------------
+-- Trigger: auto_post_completed_service_request
+-- Fires AFTER UPDATE ON ServiceRequest, when status becomes 'Completed'.
+-- Posts the service straight to the guest's folio (POS -> Folio auto-
+-- posting) if an Invoice already exists for the reservation. If none
+-- exists yet, this is a deliberate no-op — staff add it manually once
+-- they create the invoice, same as any other line item.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION auto_post_completed_service_request()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_invoice_id INT;
+BEGIN
+    IF NEW.status = 'Completed' AND OLD.status != 'Completed' THEN
+        SELECT invoice_id INTO v_invoice_id
+        FROM Invoice WHERE reservation_id = NEW.reservation_id
+        ORDER BY invoice_id DESC LIMIT 1;
+
+        IF v_invoice_id IS NOT NULL THEN
+            INSERT INTO InvoiceItem (invoice_id, service_id, item_type, quantity, amount)
+            VALUES (v_invoice_id, NEW.service_id, 'Service', 1, 0);
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_auto_post_completed_service_request ON ServiceRequest;
+CREATE TRIGGER trg_auto_post_completed_service_request
+AFTER UPDATE ON ServiceRequest
+FOR EACH ROW EXECUTE FUNCTION auto_post_completed_service_request();
+
+
 
 -- Trigger to prevent double booking of rooms
 CREATE OR REPLACE FUNCTION prevent_double_booking()
@@ -398,6 +437,34 @@ DROP TRIGGER IF EXISTS trg_prevent_double_booking ON ReservationRoom;
 CREATE TRIGGER trg_prevent_double_booking
 BEFORE INSERT OR UPDATE ON ReservationRoom
 FOR EACH ROW EXECUTE FUNCTION prevent_double_booking();
+
+
+
+-- Trigger to block booking a room that has an open (unresolved) maintenance
+-- ticket — "Out of Service" is derived from RoomMaintenance rather than a
+-- stored flag, so a room automatically becomes bookable again the moment its
+-- last open ticket is marked Completed, with nothing else to keep in sync.
+CREATE OR REPLACE FUNCTION prevent_booking_maintenance_room()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_open_tickets INT;
+BEGIN
+    SELECT COUNT(*) INTO v_open_tickets
+    FROM RoomMaintenance
+    WHERE room_id = NEW.room_id AND status != 'Completed';
+
+    IF v_open_tickets > 0 THEN
+        RAISE EXCEPTION 'Room % is out of service (open maintenance ticket)', NEW.room_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prevent_booking_maintenance_room ON ReservationRoom;
+CREATE TRIGGER trg_prevent_booking_maintenance_room
+BEFORE INSERT OR UPDATE ON ReservationRoom
+FOR EACH ROW EXECUTE FUNCTION prevent_booking_maintenance_room();
 
 
 
@@ -543,8 +610,12 @@ ORDER BY invoice_year DESC, invoice_month DESC;
 ALTER TABLE Branch ADD CONSTRAINT chk_branch_status CHECK (status IN ('Active', 'Inactive'));
 
 -- Enforce valid Employee employment statuses
-ALTER TABLE Employee ADD CONSTRAINT chk_employee_status 
+ALTER TABLE Employee ADD CONSTRAINT chk_employee_status
 CHECK (employment_status IN ('Active', 'Terminated', 'On Leave'));
+
+-- Enforce valid Room housekeeping status
+ALTER TABLE Room ADD CONSTRAINT chk_room_housekeeping_status
+CHECK (housekeeping_status IN ('Clean', 'Dirty'));
 
 -- Enforce valid RoomAvailability status
 ALTER TABLE RoomAvailability ADD CONSTRAINT chk_room_availability_status 
@@ -582,7 +653,9 @@ CHECK (status IN ('Reported', 'In Progress', 'Completed'));
 
 
 -- Trigger: auto-fill amount from RoomType.base_price or Service.price
--- 'Damage', 'Maintenance', 'Other' amounts are left untouched (staff-entered).
+-- 'Damage', 'Maintenance', 'Other', 'Fee' amounts are left untouched
+-- (staff-entered, or system-computed elsewhere — e.g. the cancellation
+-- policy trigger below sets 'Fee' amounts itself).
 CREATE OR REPLACE FUNCTION enforce_invoice_item_price()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -837,6 +910,56 @@ BEFORE UPDATE ON Reservation
 FOR EACH ROW EXECUTE FUNCTION enforce_reservation_state_machine();
 
 -- -----------------------------------------------------------------------
+-- Trigger: enforce_cancellation_policy
+-- Fires BEFORE UPDATE ON Reservation, when status transitions to
+-- 'Cancelled'. Cancellation itself is never blocked — this only decides
+-- whether a fee applies. If check-in is same-day or within 24h and an
+-- Invoice already exists for this reservation, a one-night cancellation fee
+-- (summed across every room on the reservation, at that room's RoomType
+-- base_price) is posted as a 'Fee' InvoiceItem, which then flows into
+-- sub_total/tax/total via trg_recalculate_invoice_total_on_item_change —
+-- same pattern as trg_auto_post_completed_service_request. Runs BEFORE the
+-- row update, so it still sees ReservationRoom links that
+-- trg_cleanup_on_reservation_cancel (an AFTER trigger) is about to delete.
+-- No invoice yet, or outside the window: no-op.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION enforce_cancellation_policy()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_invoice_id INT;
+    v_fee_amount DECIMAL(10, 2);
+BEGIN
+    IF NEW.status = 'Cancelled' AND OLD.status != 'Cancelled'
+       AND NEW.check_in_date - CURRENT_DATE <= 1 THEN
+
+        SELECT invoice_id INTO v_invoice_id
+        FROM Invoice WHERE reservation_id = NEW.reservation_id
+        ORDER BY invoice_id DESC LIMIT 1;
+
+        IF v_invoice_id IS NOT NULL THEN
+            SELECT COALESCE(SUM(rt.base_price), 0) INTO v_fee_amount
+            FROM ReservationRoom rr
+            JOIN Room r ON rr.room_id = r.room_id
+            JOIN RoomType rt ON r.room_type_id = rt.room_type_id
+            WHERE rr.reservation_id = NEW.reservation_id;
+
+            IF v_fee_amount > 0 THEN
+                INSERT INTO InvoiceItem (invoice_id, item_type, quantity, amount, description)
+                VALUES (v_invoice_id, 'Fee', 1, v_fee_amount, 'Cancellation fee (within 24h of check-in)');
+            END IF;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_cancellation_policy ON Reservation;
+CREATE TRIGGER trg_enforce_cancellation_policy
+BEFORE UPDATE ON Reservation
+FOR EACH ROW EXECUTE FUNCTION enforce_cancellation_policy();
+
+-- -----------------------------------------------------------------------
 -- Trigger: cleanup_on_reservation_cancel
 -- Fires AFTER UPDATE ON Reservation.
 -- Automatically deletes associated ReservationRoom records when a reservation
@@ -856,6 +979,52 @@ DROP TRIGGER IF EXISTS trg_cleanup_on_reservation_cancel ON Reservation;
 CREATE TRIGGER trg_cleanup_on_reservation_cancel
 AFTER UPDATE ON Reservation
 FOR EACH ROW EXECUTE FUNCTION cleanup_reservation_rooms_on_cancel();
+
+-- -----------------------------------------------------------------------
+-- Trigger: mark_room_dirty_on_checkout
+-- Fires AFTER UPDATE ON Reservation, when status becomes 'Checked Out'.
+-- Flips every room from this stay to housekeeping_status = 'Dirty' and
+-- queues a cleaning RoomTask for each — the "inventory reset to
+-- Dirty/Vacant on checkout" step of a real front-desk workflow.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION mark_room_dirty_on_checkout()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status = 'Checked Out' AND OLD.status != 'Checked Out' THEN
+        UPDATE Room SET housekeeping_status = 'Dirty'
+        WHERE room_id IN (SELECT room_id FROM ReservationRoom WHERE reservation_id = NEW.reservation_id);
+
+        INSERT INTO RoomTask (room_id, description, status)
+        SELECT room_id, 'Post-checkout cleaning', 'Pending'
+        FROM ReservationRoom WHERE reservation_id = NEW.reservation_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_mark_room_dirty_on_checkout ON Reservation;
+CREATE TRIGGER trg_mark_room_dirty_on_checkout
+AFTER UPDATE ON Reservation
+FOR EACH ROW EXECUTE FUNCTION mark_room_dirty_on_checkout();
+
+-- -----------------------------------------------------------------------
+-- Trigger: mark_room_clean_on_task_complete
+-- Fires AFTER UPDATE ON RoomTask, when status becomes 'Completed'.
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION mark_room_clean_on_task_complete()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status = 'Completed' AND OLD.status != 'Completed' THEN
+        UPDATE Room SET housekeeping_status = 'Clean' WHERE room_id = NEW.room_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_mark_room_clean_on_task_complete ON RoomTask;
+CREATE TRIGGER trg_mark_room_clean_on_task_complete
+AFTER UPDATE ON RoomTask
+FOR EACH ROW EXECUTE FUNCTION mark_room_clean_on_task_complete();
 
 
 -- ====================================================================================

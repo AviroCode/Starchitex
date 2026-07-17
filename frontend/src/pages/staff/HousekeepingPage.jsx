@@ -37,6 +37,7 @@ export default function HousekeepingPage({ branches, branchId, setBranchId }) {
   const roomNo = (id) => rooms.find((r) => r.roomId === id)?.roomNumber ?? id
   const branchTasks = tasks.filter((t) => roomIds.has(t.roomId))
   const branchMaint = maint.filter((m) => roomIds.has(m.roomId))
+  const outOfServiceRoomIds = new Set(branchMaint.filter((m) => m.status !== 'Completed').map((m) => m.roomId))
 
   const createTask = async (e) => {
     e.preventDefault()
@@ -123,7 +124,23 @@ export default function HousekeepingPage({ branches, branchId, setBranchId }) {
         </div>
 
         <div className="panel panel-grow">
-          <h3>Housekeeping tasks</h3>
+          <h3>Room status</h3>
+          <table className="res-table">
+            <thead><tr><th>Room</th><th>Floor</th><th>Housekeeping</th><th>Bookable</th></tr></thead>
+            <tbody>
+              {rooms.map((r) => (
+                <tr key={r.roomId}>
+                  <td className="mono">{r.roomNumber}</td>
+                  <td className="mono">{r.floor}</td>
+                  <td><StatusBadge value={r.housekeepingStatus} /></td>
+                  <td>{outOfServiceRoomIds.has(r.roomId) ? <StatusBadge value="Out of Service" /> : <StatusBadge value="Available" />}</td>
+                </tr>
+              ))}
+              {rooms.length === 0 && <tr><td colSpan="4" className="empty">No rooms for this branch.</td></tr>}
+            </tbody>
+          </table>
+
+          <h3 style={{ marginTop: '1.4rem' }}>Housekeeping tasks</h3>
           <table className="res-table">
             <thead><tr><th>Room</th><th>Description</th><th>Status</th><th></th></tr></thead>
             <tbody>

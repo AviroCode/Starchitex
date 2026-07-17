@@ -48,6 +48,10 @@ public class InvoiceService {
         return invoiceRepository.update(invoice) > 0;
     }
 
+    public boolean markRefunded(int invoiceId) {
+        return invoiceRepository.markRefunded(invoiceId) > 0;
+    }
+
     @Transactional
     public void recalculateInvoice(int invoiceId) {
         invoiceRepository.recalculateInvoiceTotal(invoiceId);
@@ -58,5 +62,13 @@ public class InvoiceService {
     public void refreshAnalyticsCache() {
         invoiceRepository.refreshMonthlyRevenueReport();
         System.out.println("Analytics Materialized View Refreshed.");
+    }
+
+    public List<com.starchitex.backend.model.MonthlyRevenueDTO> getMonthlyRevenueReport() {
+        return invoiceRepository.getMonthlyRevenueReport();
+    }
+
+    public com.starchitex.backend.model.AnalyticsSummaryDTO getAnalyticsSummary() {
+        return invoiceRepository.getAnalyticsSummary();
     }
 }

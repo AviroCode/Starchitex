@@ -27,7 +27,8 @@ public class ReservationRoomRepository {
             rs.getString("room_number"),
             rs.getObject("floor") != null ? rs.getInt("floor") : null,
             rs.getInt("branch_id"),
-            rs.getInt("room_type_id")
+            rs.getInt("room_type_id"),
+            rs.getString("housekeeping_status")
     );
 
     public List<ReservationRoom> findAll() {

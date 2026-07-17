@@ -26,6 +26,7 @@ import EmployeesPage from './pages/admin/EmployeesPage.jsx'
 import CatalogPage from './pages/admin/CatalogPage.jsx'
 import RolesPermissionsPage from './pages/admin/RolesPermissionsPage.jsx'
 import AuditLogPage from './pages/admin/AuditLogPage.jsx'
+import AnalyticsPage from './pages/admin/AnalyticsPage.jsx'
 
 const ADMIN_TIER_ROLES = ['System Administrator', 'Hotel Owner', 'Sales Executive']
 const GUEST_HOME = '/guest/book'
@@ -129,6 +130,7 @@ function Shell() {
                 { path: '/admin/catalog', label: 'Catalog' },
                 { path: '/admin/roles', label: 'Roles & Permissions' },
                 { path: '/admin/audit', label: 'Audit Log' },
+                { path: '/admin/analytics', label: 'Analytics' },
               ],
             }]
           : []),
@@ -158,9 +160,10 @@ function Shell() {
 
           <Route path="/admin/branches" element={<BranchesPage branches={branches} refreshBranches={refreshBranches} roleName={roleName} />} />
           <Route path="/admin/employees" element={<EmployeesPage branches={branches} roleName={roleName} />} />
-          <Route path="/admin/catalog" element={<CatalogPage />} />
+          <Route path="/admin/catalog" element={<CatalogPage branches={branches} />} />
           <Route path="/admin/roles" element={<RolesPermissionsPage roleName={roleName} />} />
           <Route path="/admin/audit" element={<AuditLogPage />} />
+          <Route path="/admin/analytics" element={<AnalyticsPage />} />
 
           <Route path="*" element={<Navigate to={isGuest ? GUEST_HOME : STAFF_HOME} replace />} />
         </Routes>

@@ -120,6 +120,20 @@ export default function BillingPage({ guests }) {
     }
   }
 
+  // Doesn't move money — just records that staff processed the refund
+  // outside the app (no payment gateway integration to reverse a charge
+  // through). See InvoiceRepository.markRefunded.
+  const markRefunded = async () => {
+    setError(null); setNotice(null)
+    try {
+      await api.markInvoiceRefunded(selected.invoiceId)
+      setNotice(`Invoice #${selected.invoiceId} marked as Refunded.`)
+      refreshSelected()
+    } catch {
+      setError('Could not mark this invoice as refunded.')
+    }
+  }
+
   return (
     <section className="page">
       <header className="page-head"><h2>Billing</h2></header>
@@ -147,7 +161,7 @@ export default function BillingPage({ guests }) {
               <form onSubmit={addItem} className="res-form">
                 <label>Type
                   <select value={itemType} onChange={(e) => setItemType(e.target.value)}>
-                    <option>Room</option><option>Service</option><option>Damage</option><option>Maintenance</option><option>Other</option>
+                    <option>Room</option><option>Service</option><option>Damage</option><option>Maintenance</option><option>Other</option><option>Fee</option>
                   </select>
                 </label>
                 {itemType === 'Room' && (
@@ -167,7 +181,7 @@ export default function BillingPage({ guests }) {
                   </label>
                 )}
                 <label>Quantity<input type="number" min="1" value={itemQty} onChange={(e) => setItemQty(e.target.value)} required /></label>
-                {['Damage', 'Maintenance', 'Other'].includes(itemType) && (
+                {['Damage', 'Maintenance', 'Other', 'Fee'].includes(itemType) && (
                   <label>Amount<input type="number" min="0" step="0.01" value={itemAmount} onChange={(e) => setItemAmount(e.target.value)} required /></label>
                 )}
                 <label>Note<input value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} /></label>
@@ -212,6 +226,14 @@ export default function BillingPage({ guests }) {
           {selected && (
             <div className="folio" style={{ marginTop: '1.4rem' }}>
               <h4>Invoice #{selected.invoiceId} folio</h4>
+              {paid > Number(selected.totalAmount) && selected.status !== 'Refunded' && (
+                <Banner>
+                  Refund due: ฿ {fmt(paid - selected.totalAmount)} — paid more than the current total
+                  (a cancellation fee may have reduced it, or this was a straight overpayment).
+                  Process the refund outside the app, then{' '}
+                  <button type="button" className="link-inline" onClick={markRefunded}>mark this invoice Refunded</button>.
+                </Banner>
+              )}
               <dl>
                 <div><dt>Sub-total</dt><dd className="mono">฿ {fmt(selected.subTotal)}</dd></div>
                 <div><dt>Tax (7%)</dt><dd className="mono">฿ {fmt(selected.taxAmount)}</dd></div>

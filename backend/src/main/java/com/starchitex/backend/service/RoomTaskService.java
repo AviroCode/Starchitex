@@ -29,7 +29,20 @@ public class RoomTaskService {
     }
 
     public boolean createTask(RoomTask task) {
-        return roomTaskRepository.save(task) > 0;
+        // Same fix as RoomMaintenanceService.createMaintenanceTicket: the DB
+        // column defaults to 'Pending', but that default is skipped when the
+        // column is explicitly set to null (a request body with no status
+        // field), which trips the NOT NULL constraint. Force it in Java.
+        RoomTask withStatus = task.status() != null ? task : new RoomTask(
+                task.roomtaskId(),
+                task.roomId(),
+                task.assignedEmployeeId(),
+                task.description(),
+                task.assignedTime(),
+                task.completedTime(),
+                "Pending"
+        );
+        return roomTaskRepository.save(withStatus) > 0;
     }
 
     public boolean updateTask(RoomTask task) {

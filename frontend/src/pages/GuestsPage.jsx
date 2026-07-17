@@ -15,8 +15,21 @@ export default function GuestsPage({ guests, refreshGuests }) {
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
 
+  const findDuplicate = () =>
+    guests.find((g) =>
+      (form.email && g.email?.toLowerCase() === form.email.toLowerCase()) ||
+      (form.passportNumber && g.passportNumber === form.passportNumber)
+    )
+
   const create = async (e) => {
     e.preventDefault()
+    // CRM check: surface an existing match instead of letting this fail as
+    // a bare UNIQUE-constraint violation with no context.
+    const dup = findDuplicate()
+    if (dup) {
+      setError(`A guest with this email or passport already exists: ${dup.firstName} ${dup.lastName} (ID ${dup.guestId}) — no new guest created.`)
+      return
+    }
     setSaving(true); setError(null); setNotice(null)
     try {
       await api.createGuest(form)
