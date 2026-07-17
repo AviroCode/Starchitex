@@ -61,6 +61,26 @@ public class GuestRepository {
         );
     }
 
+    // Same INSERT as save(), but returns the generated guest_id instead of a
+    // row count — needed by the register-guest/anonymous-booking auth flows,
+    // which have to attach the new guest to a GuestCredentials row or a
+    // reservation in the same transaction.
+    public int saveReturningId(Guest guest) {
+        String sql = "INSERT INTO Guest (first_name, last_name, gender, date_of_birth, nationality, passport_number, phone_number, email, address) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING guest_id";
+        return jdbcTemplate.queryForObject(sql, Integer.class,
+                guest.firstName(),
+                guest.lastName(),
+                guest.gender(),
+                guest.dateOfBirth(),
+                guest.nationality(),
+                guest.passportNumber(),
+                guest.phoneNumber(),
+                guest.email(),
+                guest.address()
+        );
+    }
+
     public int update(Guest guest) {
         String sql = "UPDATE Guest SET first_name = ?, last_name = ?, gender = ?, date_of_birth = ?, nationality = ?, passport_number = ?, phone_number = ?, email = ?, address = ? " +
                      "WHERE guest_id = ?";

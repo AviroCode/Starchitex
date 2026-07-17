@@ -35,20 +35,26 @@ async function request(path, options = {}) {
   return ct.includes('json') ? res.json() : res.text()
 }
 
+// Shared by every /api/auth/** endpoint that responds with a bare JWT string
+// on success — login, register-guest, google-login.
+async function postForToken(path, body, fallbackMessage) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const text = await res.text()
+  if (!res.ok) throw new ApiError(text || fallbackMessage, res.status)
+  const jwt = text.replace(/^"|"$/g, '').trim()
+  if (!jwt) throw new ApiError('Empty token from server.', 500)
+  return jwt
+}
+
 export const api = {
   // auth (§2): returns the raw JWT string
-  async login(username, password) {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    })
-    if (!res.ok) throw new ApiError(res.status === 401 ? 'Wrong username or password.' : `Login failed (${res.status})`, res.status)
-    const text = await res.text()
-    const jwt = text.replace(/^"|"$/g, '').trim()
-    if (!jwt) throw new ApiError('Empty token from server.', 500)
-    return jwt
-  },
+  login: (username, password) => postForToken('/api/auth/login', { username, password }, 'Wrong username or password.'),
+  registerGuest: (r) => postForToken('/api/auth/register-guest', r, 'Could not register.'),
+  googleLogin: (email) => postForToken('/api/auth/google-login', { email }, 'No staff account found for that organization email.'),
 
   branches: () => request('/api/branches'),
   createBranch: (b) => request('/api/branches', { method: 'POST', body: JSON.stringify(b) }),

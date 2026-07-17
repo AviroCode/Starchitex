@@ -74,8 +74,10 @@ INSERT INTO Branch (branch_id, name, address, city, province, postal_code, email
 ON CONFLICT (branch_id) DO NOTHING;
 
 -- ---------- Bootstrap admin (password 'demo1234' — rotate after first deploy) ----------
+-- Email domain matches the default app.staff-google-domain (STAFF_GOOGLE_DOMAIN
+-- env var) so this account can also demo the simulated Google sign-in path.
 INSERT INTO Employee (employee_id, branch_id, first_name, last_name, position, gender, date_of_birth, phone, email, hire_date, salary, employment_status) VALUES
- (1,1,'System','Administrator','System Administrator','Other','2000-01-01','','admin@example.com',CURRENT_DATE,0,'Active')
+ (1,1,'System','Administrator','System Administrator','Other','2000-01-01','','admin.sys@starchitex.com',CURRENT_DATE,0,'Active')
 ON CONFLICT (employee_id) DO NOTHING;
 
 INSERT INTO EmployeeCredentials (employee_id, username, password_hash, role_id, last_login) VALUES

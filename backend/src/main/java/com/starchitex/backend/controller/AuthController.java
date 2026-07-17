@@ -7,6 +7,7 @@ import com.starchitex.backend.repository.GuestCredentialsRepository;
 import com.starchitex.backend.repository.EmployeeRepository;
 import com.starchitex.backend.model.Employee;
 import com.starchitex.backend.security.JwtUtil;
+import com.starchitex.backend.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,13 +24,15 @@ public class AuthController {
     private final EmployeeCredentialsRepository employeeRepo;
     private final GuestCredentialsRepository guestRepo;
     private final EmployeeRepository employeeDataRepo;
+    private final AuthService authService;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, EmployeeCredentialsRepository employeeRepo, GuestCredentialsRepository guestRepo, EmployeeRepository employeeDataRepo) {
+    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, EmployeeCredentialsRepository employeeRepo, GuestCredentialsRepository guestRepo, EmployeeRepository employeeDataRepo, AuthService authService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.employeeRepo = employeeRepo;
         this.guestRepo = guestRepo;
         this.employeeDataRepo = employeeDataRepo;
+        this.authService = authService;
     }
 
     @PostMapping("/login")
@@ -68,6 +71,28 @@ public class AuthController {
         }
     }
 
-    // Inner record for request body mapping
+    // Public self-registration for guests — creates a real account (Guest +
+    // GuestCredentials) and logs them straight in. See AuthService for why
+    // this is safe to expose without authentication.
+    @PostMapping("/register-guest")
+    public ResponseEntity<String> registerGuest(@RequestBody AuthService.RegisterGuestRequest request) {
+        try {
+            String token = authService.registerGuest(request);
+            return ResponseEntity.status(201).body(token);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Could not register — that email may already be in use, or a required field is missing.");
+        }
+    }
+
+    // SIMULATED "sign in with organization Google" — see AuthService.googleLogin.
+    @PostMapping("/google-login")
+    public ResponseEntity<String> googleLogin(@RequestBody GoogleLoginRequest request) {
+        return authService.googleLogin(request.email())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(401).body("No staff account found for that organization email."));
+    }
+
+    // Inner records for request body mapping
     public record LoginRequest(String username, String password) {}
+    public record GoogleLoginRequest(String email) {}
 }

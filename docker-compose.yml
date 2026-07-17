@@ -29,6 +29,9 @@ services:
       - DB_USERNAME=starchitex_user
       - DB_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env}
+      # Email domain staff must belong to for the simulated Google sign-in
+      # flow (AuthService.googleLogin) — optional, defaults to starchitex.com.
+      - STAFF_GOOGLE_DOMAIN=${STAFF_GOOGLE_DOMAIN:-starchitex.com}
     depends_on:
       - db
 

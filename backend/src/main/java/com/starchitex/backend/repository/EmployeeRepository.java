@@ -49,6 +49,12 @@ public class EmployeeRepository {
         return jdbcTemplate.query(sql, employeeRowMapper, branchId);
     }
 
+    public Optional<Employee> findByEmail(String email) {
+        String sql = "SELECT * FROM Employee WHERE email = ?";
+        List<Employee> employees = jdbcTemplate.query(sql, employeeRowMapper, email);
+        return employees.isEmpty() ? Optional.empty() : Optional.of(employees.get(0));
+    }
+
     public int save(Employee employee) {
         String sql = "INSERT INTO Employee (branch_id, first_name, last_name, position, gender, date_of_birth, phone, email, hire_date, salary, employment_status) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";

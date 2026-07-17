@@ -5,6 +5,7 @@ import { api } from './api/client.js'
 import { decodeJwt } from './lib/jwt.js'
 import Sidebar from './components/Sidebar.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import RegisterPage from './pages/RegisterPage.jsx'
 import Banner from './components/Banner.jsx'
 
 import RoomsPage from './pages/RoomsPage.jsx'
@@ -36,6 +37,12 @@ function LoginRoute() {
   const { token } = useAuth()
   if (token) return <Navigate to="/" replace />
   return <LoginPage />
+}
+
+function RegisterRoute() {
+  const { token } = useAuth()
+  if (token) return <Navigate to="/" replace />
+  return <RegisterPage />
 }
 
 function Shell() {
@@ -178,6 +185,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginRoute />} />
+          <Route path="/register" element={<RegisterRoute />} />
           <Route path="/*" element={<Shell />} />
         </Routes>
       </BrowserRouter>
