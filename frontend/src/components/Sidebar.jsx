@@ -1,29 +1,28 @@
+import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
-const NAV = [
-  { id: 'rooms',        label: 'Rooms' },
-  { id: 'reservations', label: 'Reservations' },
-  { id: 'guests',       label: 'Guests' },
-  { id: 'billing',      label: 'Billing' },
-]
-
-export default function Sidebar({ page, onNavigate }) {
+export default function Sidebar({ tagline, navSections }) {
   const { username, logout } = useAuth()
   return (
     <aside className="sidebar">
       <div className="brand">
         <h1>Starchitex</h1>
-        <p className="tagline">Front Desk Console</p>
+        <p className="tagline">{tagline}</p>
       </div>
       <nav>
-        {NAV.map((n) => (
-          <button
-            key={n.id}
-            className={`nav-item ${page === n.id ? 'active' : ''}`}
-            onClick={() => onNavigate(n.id)}
-          >
-            {n.label}
-          </button>
+        {navSections.map((section, i) => (
+          <div className="nav-section" key={section.label ?? `s${i}`}>
+            {section.label && <p className="nav-section-label">{section.label}</p>}
+            {section.items.map((n) => (
+              <NavLink
+                key={n.path}
+                to={n.path}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              >
+                {n.label}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
       <div className="sidebar-foot">

@@ -7,7 +7,7 @@ import StatusBadge from '../components/StatusBadge.jsx'
 const REJECTION_HINT =
   'The database rejected this — likely check-out is not after check-in, or a required field is invalid.'
 
-export default function ReservationsPage({ guests }) {
+export default function ReservationsPage({ guests, branchId }) {
   const [reservations, setReservations] = useState([])
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
@@ -32,6 +32,7 @@ export default function ReservationsPage({ guests }) {
     setSaving(true); setError(null); setNotice(null)
     try {
       await api.createReservation({
+        branchId,
         guestId: Number(guestId),
         checkInDate: checkIn,
         checkOutDate: checkOut,
@@ -50,18 +51,21 @@ export default function ReservationsPage({ guests }) {
     }
   }
 
-  // Status transitions send the full object back (PUT updates all columns).
+  // Status transitions call the dedicated action endpoints (each one's own
+  // @PreAuthorize + service-layer validation) rather than a full-object PUT,
+  // which could otherwise silently clobber unrelated fields.
+  const ACTIONS = {
+    Confirmed: [api.confirmReservation, 'confirmed'],
+    'Checked In': [api.checkInReservation, 'checked in'],
+    'Checked Out': [api.checkOutReservation, 'checked out'],
+    Cancelled: [api.cancelReservation, 'cancelled'],
+  }
+
   const transition = async (r, nextStatus) => {
     setError(null); setNotice(null)
-    const now = new Date().toISOString().slice(0, 19)
-    const body = {
-      ...r,
-      status: nextStatus,
-      actualCheckinTime: nextStatus === 'Checked In' ? now : r.actualCheckinTime,
-      actualCheckoutTime: nextStatus === 'Checked Out' ? now : r.actualCheckoutTime,
-    }
+    const [action] = ACTIONS[nextStatus]
     try {
-      await api.updateReservation(r.reservationId, body)
+      await action(r.reservationId)
       setNotice(
         nextStatus === 'Cancelled'
           ? `Reservation ${r.reservationId} cancelled — the database trigger has written an audit-log row.`

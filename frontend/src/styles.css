@@ -36,7 +36,14 @@ body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink)
 .tagline { margin: 0.15rem 0 0; color: var(--brass-soft); font-size: 0.66rem; letter-spacing: 0.26em; text-transform: uppercase; }
 .tagline.dark { color: #8a8271; }
 .sidebar nav { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.nav-section { display: flex; flex-direction: column; gap: 0.25rem; }
+.nav-section + .nav-section { margin-top: 1.2rem; }
+.nav-section-label {
+  margin: 0 0 0.3rem 0.75rem; font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: #8a8271;
+}
 .nav-item {
+  display: block; text-decoration: none;
   text-align: left; font: inherit; font-size: 0.9rem; letter-spacing: 0.04em;
   background: none; border: none; color: var(--brass-soft);
   padding: 0.6rem 0.75rem; border-left: 3px solid transparent; cursor: pointer;
@@ -86,6 +93,8 @@ body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink)
 .room-no { font-family: 'IBM Plex Mono', monospace; font-size: 1.15rem; font-weight: 500; }
 .floor { font-size: 0.68rem; color: #6b6455; letter-spacing: 0.05em; }
 .rtype { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--brass); margin-top: 0.15rem; }
+.key-tag-wrap { display: flex; flex-direction: column; gap: 0.4rem; }
+.book-btn { width: 100%; text-align: center; }
 
 /* ---------- forms ---------- */
 .res-form { display: flex; flex-direction: column; gap: 0.8rem; }
@@ -120,6 +129,13 @@ body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink)
   background: none; color: var(--ink); cursor: pointer; white-space: nowrap;
 }
 .mini-btn:hover { background: var(--brass-soft); }
+.mini-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ---------- roles/permissions matrix ---------- */
+.matrix th { white-space: nowrap; padding: 0.4rem 0.5rem; }
+.matrix-cell { text-align: center; }
+.matrix-cell input { width: 16px; height: 16px; cursor: pointer; }
+.matrix-cell input:disabled { cursor: default; }
 
 /* ---------- status badges ---------- */
 .status { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 2px; white-space: nowrap; }
@@ -130,6 +146,9 @@ body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink)
 .status-cancelled     { background: #f6e3de; color: var(--alert); }
 .status-paid          { background: #e2ede8; color: var(--sage); }
 .status-partiallypaid { background: var(--brass-soft); color: #6b5312; }
+.status-inprogress    { background: var(--brass-soft); color: #6b5312; }
+.status-completed     { background: #e2ede8; color: var(--sage); }
+.status-reported      { background: #f6e3de; color: var(--alert); }
 
 /* ---------- banners ---------- */
 .banner { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.7rem 1rem; border-radius: 3px; font-size: 0.88rem; }
