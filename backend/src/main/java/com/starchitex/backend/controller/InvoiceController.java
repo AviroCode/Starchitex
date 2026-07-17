@@ -3,6 +3,7 @@ package com.starchitex.backend.controller;
 import com.starchitex.backend.model.Invoice;
 import com.starchitex.backend.service.InvoiceService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class InvoiceController {
         return invoiceService.getInvoicesByPayerGuestId(payerGuestId);
     }
 
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
     @PostMapping
     public ResponseEntity<String> createInvoice(@RequestBody Invoice invoice) {
         boolean isCreated = invoiceService.createInvoice(invoice);

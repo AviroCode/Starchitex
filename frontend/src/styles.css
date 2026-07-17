@@ -172,6 +172,7 @@ body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink)
 .status-cancelled     { background: #f6e3de; color: var(--alert); }
 .status-paid          { background: #e2ede8; color: var(--sage); }
 .status-partiallypaid { background: var(--brass-soft); color: #6b5312; }
+.status-unpaid        { background: #f6e3de; color: var(--alert); }
 .status-inprogress    { background: var(--brass-soft); color: #6b5312; }
 .status-completed     { background: #e2ede8; color: var(--sage); }
 .status-reported      { background: #f6e3de; color: var(--alert); }

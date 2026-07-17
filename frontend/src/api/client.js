@@ -84,7 +84,11 @@ export const api = {
 
   invoices: () => request('/api/invoices'),
   invoicesByGuest: (guestId) => request(`/api/invoices/guest/${guestId}`),
+  createInvoice: (inv) => request('/api/invoices', { method: 'POST', body: JSON.stringify(inv) }),
+  invoiceItemsByInvoice: (invoiceId) => request(`/api/invoice-items/invoice/${invoiceId}`),
+  createInvoiceItem: (item) => request('/api/invoice-items', { method: 'POST', body: JSON.stringify(item) }),
   paymentsByInvoice: (invoiceId) => request(`/api/payments/invoice/${invoiceId}`),
+  createPayment: (p) => request('/api/payments', { method: 'POST', body: JSON.stringify(p) }),
 
   roles: () => request('/api/roles'),
   permissions: () => request('/api/permissions'),
