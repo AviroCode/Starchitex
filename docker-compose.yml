@@ -15,6 +15,11 @@ services:
       # on an empty data directory).
       - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
       - ./database/seed/seed_data.sql:/docker-entrypoint-initdb.d/02_seed_data.sql:ro
+      # Rich demo/testing dataset (extra branch, rooms, staff, guests, live
+      # reservations to exercise triggers) — local Docker only, see
+      # database/seed/demo_data.sql's header. A real deploy applies
+      # schema.sql + seed_data.sql by hand and never touches this file.
+      - ./database/seed/demo_data.sql:/docker-entrypoint-initdb.d/03_demo_data.sql:ro
 
   backend:
     build:
