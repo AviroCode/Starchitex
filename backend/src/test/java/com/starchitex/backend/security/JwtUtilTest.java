@@ -14,11 +14,12 @@ class JwtUtilTest {
     void tokenRoundTripsClaimsWithEphemeralKey() {
         JwtUtil jwtUtil = new JwtUtil("");
 
-        String token = jwtUtil.generateToken("reception.bkk", 5, 1);
+        String token = jwtUtil.generateToken("reception.bkk", 5, 1, null);
 
         assertEquals("reception.bkk", jwtUtil.extractUsername(token));
         assertEquals(5, jwtUtil.extractRoleId(token));
         assertEquals(1, jwtUtil.extractBranchId(token));
+        assertNull(jwtUtil.extractGuestId(token));
         assertTrue(jwtUtil.isTokenValid(token, "reception.bkk"));
         assertFalse(jwtUtil.isTokenValid(token, "someone.else"));
     }
@@ -28,7 +29,7 @@ class JwtUtilTest {
         String secret = Base64.getEncoder().encodeToString("a-test-only-secret-that-is-long-enough-for-hs256".getBytes());
         JwtUtil jwtUtil = new JwtUtil(secret);
 
-        String token = jwtUtil.generateToken("admin.sys", 1, null);
+        String token = jwtUtil.generateToken("admin.sys", 1, null, null);
 
         assertEquals("admin.sys", jwtUtil.extractUsername(token));
         assertEquals(1, jwtUtil.extractRoleId(token));
@@ -37,11 +38,21 @@ class JwtUtilTest {
     }
 
     @Test
+    void tokenEmbedsGuestIdForGuestLogins() {
+        JwtUtil jwtUtil = new JwtUtil("");
+
+        String token = jwtUtil.generateToken("demo.guest", 10, null, 6);
+
+        assertEquals(6, jwtUtil.extractGuestId(token));
+        assertNull(jwtUtil.extractBranchId(token));
+    }
+
+    @Test
     void differentInstancesWithDefaultSecretDoNotShareASigningKey() {
         JwtUtil first = new JwtUtil("");
         JwtUtil second = new JwtUtil("");
 
-        String token = first.generateToken("demo.guest", 10, null);
+        String token = first.generateToken("demo.guest", 10, null, 6);
 
         // Ephemeral keys are generated per-instance, so a token signed by one
         // JwtUtil cannot be parsed by another — this is exactly why JWT_SECRET

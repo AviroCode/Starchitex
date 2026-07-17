@@ -39,7 +39,7 @@ public class ReservationRoomController {
         return reservationRoomService.getReservationIdsByRoomId(roomId);
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
     @PostMapping
     public ResponseEntity<String> assignRoomToReservation(@RequestBody ReservationRoom reservationRoom) {
         try {

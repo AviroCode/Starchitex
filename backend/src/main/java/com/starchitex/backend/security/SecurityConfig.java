@@ -38,6 +38,13 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // Allow unauthenticated access to login
+                // Tomcat internally forwards to /error to render any uncaught
+                // exception (e.g. a DB constraint violation). That forward
+                // re-enters this same filter chain as a fresh, unauthenticated
+                // dispatch — without this, it gets rejected with a bare 403
+                // that silently replaces the real status code (500, etc.)
+                // the client should have seen.
+                .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated() // All other endpoints require authentication
             )
             .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // No sessions, purely JWT

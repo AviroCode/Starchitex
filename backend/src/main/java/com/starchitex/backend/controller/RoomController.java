@@ -24,7 +24,7 @@ public class RoomController {
         return roomService.getAllRooms();
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
     @GetMapping("/{id}")
     public ResponseEntity<Room> getRoomById(@PathVariable int id) {
         return roomService.getRoomById(id)
@@ -32,7 +32,7 @@ public class RoomController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
     @GetMapping("/branch/{branchId}")
     public List<Room> getRoomsByBranchId(@PathVariable int branchId) {
         return roomService.getRoomsByBranchId(branchId);

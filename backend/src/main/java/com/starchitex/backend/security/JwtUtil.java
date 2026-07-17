@@ -32,11 +32,12 @@ public class JwtUtil {
         }
     }
 
-    public String generateToken(String username, int roleId, Integer branchId) {
+    public String generateToken(String username, int roleId, Integer branchId, Integer guestId) {
         return Jwts.builder()
                 .setSubject(username)
                 .claim("roleId", roleId)
                 .claim("branchId", branchId)
+                .claim("guestId", guestId)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(key)
@@ -57,6 +58,10 @@ public class JwtUtil {
     
     public Integer extractBranchId(String token) {
         return extractClaims(token).get("branchId", Integer.class);
+    }
+
+    public Integer extractGuestId(String token) {
+        return extractClaims(token).get("guestId", Integer.class);
     }
 
     public int extractRoleId(String token) {

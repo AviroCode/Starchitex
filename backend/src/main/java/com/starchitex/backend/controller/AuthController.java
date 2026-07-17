@@ -39,10 +39,11 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(request.username(), request.password())
             );
 
-            // Fetch the user's roleId from the DB to embed in the token
+            // Fetch the user's roleId (and branchId/guestId, whichever applies) to embed in the token
             int roleId = -1;
             Integer branchId = null;
-            
+            Integer guestId = null;
+
             Optional<EmployeeCredentials> empOpt = employeeRepo.findByUsername(request.username());
             if (empOpt.isPresent()) {
                 roleId = empOpt.get().roleId();
@@ -54,11 +55,12 @@ public class AuthController {
                 Optional<GuestCredentials> guestOpt = guestRepo.findByUsername(request.username());
                 if (guestOpt.isPresent()) {
                     roleId = guestOpt.get().roleId();
+                    guestId = guestOpt.get().guestId();
                 }
             }
 
             // Generate JWT
-            String token = jwtUtil.generateToken(request.username(), roleId, branchId);
+            String token = jwtUtil.generateToken(request.username(), roleId, branchId, guestId);
             return ResponseEntity.ok(token);
 
         } catch (Exception e) {

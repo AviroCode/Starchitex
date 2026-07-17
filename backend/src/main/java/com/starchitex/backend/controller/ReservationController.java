@@ -39,7 +39,7 @@ public class ReservationController {
         return reservationService.getReservationsByGuestId(guestId);
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
     @PostMapping
     public ResponseEntity<String> createReservation(@RequestBody Reservation reservation) {
         boolean isCreated = reservationService.createReservation(reservation);
@@ -50,7 +50,7 @@ public class ReservationController {
         }
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
     @PostMapping("/{reservationId}/confirm")
     public ResponseEntity<String> confirm(@PathVariable int reservationId) {
         try {
@@ -61,7 +61,7 @@ public class ReservationController {
         }
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
     @PostMapping("/{reservationId}/check-in")
     public ResponseEntity<String> checkIn(@PathVariable int reservationId) {
         try {
@@ -72,7 +72,7 @@ public class ReservationController {
         }
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
     @PostMapping("/{reservationId}/check-out")
     public ResponseEntity<String> checkOut(@PathVariable int reservationId) {
         try {
@@ -83,7 +83,7 @@ public class ReservationController {
         }
     }
 
-    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null")
+    @PreAuthorize("hasAnyRole('System Administrator', 'Hotel Owner', 'Sales Executive') or authentication.principal.branchId != null or authentication.principal.guestId != null")
     @PostMapping("/{reservationId}/cancel")
     public ResponseEntity<String> cancel(@PathVariable int reservationId) {
         try {
