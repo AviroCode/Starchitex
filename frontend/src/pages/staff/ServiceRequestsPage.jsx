@@ -93,8 +93,12 @@ export default function ServiceRequestsPage() {
                   <td>{r.description}</td>
                   <td><StatusBadge value={r.status} /></td>
                   <td className="actions">
-                    {NEXT[r.status] && <button className="mini-btn" onClick={() => complete(r)}>Mark Completed</button>}
-                    {r.status === 'Pending' && <button className="mini-btn" onClick={() => cancel(r)}>Cancel</button>}
+                    {NEXT[r.status] || r.status === 'Pending' ? (
+                      <>
+                        {NEXT[r.status] && <button className="mini-btn" onClick={() => complete(r)}>Mark Completed</button>}
+                        {r.status === 'Pending' && <button className="mini-btn" onClick={() => cancel(r)}>Cancel</button>}
+                      </>
+                    ) : <span className="actions-empty">—</span>}
                   </td>
                 </tr>
               ))}

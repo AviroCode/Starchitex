@@ -96,6 +96,27 @@ body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink)
 .key-tag-wrap { display: flex; flex-direction: column; gap: 0.4rem; }
 .book-btn { width: 100%; text-align: center; }
 
+/* ---------- room photo placeholder + booking cards ---------- */
+.photo-placeholder {
+  aspect-ratio: 4 / 3; border-radius: 4px 4px 0 0;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(168,126,47,0.14), transparent 55%),
+    linear-gradient(160deg, #efe7d6, #e2d7bd);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--brass); opacity: 0.75;
+  border: 1px solid var(--line); border-bottom: none;
+}
+.room-card {
+  border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+  background: #fff; display: flex; flex-direction: column;
+}
+.room-card-body { padding: 0.85rem 0.9rem 0.95rem; display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
+.room-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.room-card-head .room-no { font-size: 1.3rem; }
+.room-card-price { font-family: 'IBM Plex Mono', monospace; font-size: 0.9rem; color: var(--brass); white-space: nowrap; }
+.room-card-price .per-night { font-size: 0.62rem; color: #8a8271; text-transform: uppercase; letter-spacing: 0.06em; display: block; }
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+
 /* ---------- forms ---------- */
 .res-form { display: flex; flex-direction: column; gap: 0.8rem; }
 .res-form label, .login-card label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; letter-spacing: 0.03em; color: #5a5344; }
@@ -111,6 +132,7 @@ body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink)
 .res-form button:hover, .login-card button[type="submit"]:hover { background: var(--ink-2); }
 .res-form button:disabled { opacity: 0.6; cursor: default; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.pair > label { min-width: 0; }
 
 /* ---------- tables ---------- */
 .res-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
@@ -122,7 +144,11 @@ body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink)
 .row-active td { background: #f8f4ea; }
 .mono { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
 .dim { color: #8a8271; }
-.actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.actions { display: flex; gap: 0.35rem; flex-wrap: wrap; min-height: 1.6rem; align-items: center; }
+/* An entirely empty <td> can collapse its border-bottom in some browsers,
+   making the row divider look broken/misaligned — always render a visible
+   dash instead of leaving the cell truly empty. */
+.actions-empty { color: #8a8271; }
 .mini-btn {
   font: inherit; font-size: 0.72rem; letter-spacing: 0.04em;
   padding: 0.25rem 0.55rem; border: 1px solid var(--brass); border-radius: 2px;

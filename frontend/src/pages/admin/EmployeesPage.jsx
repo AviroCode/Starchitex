@@ -11,7 +11,12 @@ const EMPTY = {
 export default function EmployeesPage({ branches, roleName }) {
   const [employees, setEmployees] = useState([])
   const [roles, setRoles] = useState([])
-  const [form, setForm] = useState(EMPTY)
+  // branches is already loaded by the time this page mounts (Shell only
+  // renders routes once its boot fetch is ready) — default to the first
+  // branch so the BranchPicker's visual selection and form state agree;
+  // otherwise the picker shows a branch selected while the underlying
+  // state stays empty, silently keeping "Add employee" disabled.
+  const [form, setForm] = useState({ ...EMPTY, branchId: branches[0]?.branchId ?? '' })
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -125,7 +130,7 @@ export default function EmployeesPage({ branches, roleName }) {
                   <td>{branchName(e.branchId)}</td>
                   <td>{e.position}</td>
                   <td>{e.employmentStatus}</td>
-                  <td>{canManageCreds && <button className="mini-btn" onClick={() => setCredsFor(e)}>Set login</button>}</td>
+                  <td className="actions">{canManageCreds ? <button className="mini-btn" onClick={() => setCredsFor(e)}>Set login</button> : <span className="actions-empty">—</span>}</td>
                 </tr>
               ))}
               {employees.length === 0 && <tr><td colSpan="6" className="empty">No employees yet.</td></tr>}

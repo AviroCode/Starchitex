@@ -53,9 +53,11 @@ export default function MyReservationsPage({ guestId }) {
                 <td className="mono">{r.numOfGuests}</td>
                 <td><StatusBadge value={r.status} /></td>
                 <td className="actions">
-                  {actionsFor(r).map(([label, action, verb]) => (
-                    <button key={label} className="mini-btn" onClick={() => run(r, action, verb)}>{label}</button>
-                  ))}
+                  {actionsFor(r).length > 0
+                    ? actionsFor(r).map(([label, action, verb]) => (
+                        <button key={label} className="mini-btn" onClick={() => run(r, action, verb)}>{label}</button>
+                      ))
+                    : <span className="actions-empty">—</span>}
                 </td>
               </tr>
             ))}

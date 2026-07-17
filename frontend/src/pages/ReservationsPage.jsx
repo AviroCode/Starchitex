@@ -132,9 +132,11 @@ export default function ReservationsPage({ guests, branchId }) {
                   <td className="mono">{r.checkOutDate}</td>
                   <td><StatusBadge value={r.status} /></td>
                   <td className="actions">
-                    {actionsFor(r).map(([label, next]) => (
-                      <button key={next} className="mini-btn" onClick={() => transition(r, next)}>{label}</button>
-                    ))}
+                    {actionsFor(r).length > 0
+                      ? actionsFor(r).map(([label, next]) => (
+                          <button key={next} className="mini-btn" onClick={() => transition(r, next)}>{label}</button>
+                        ))
+                      : <span className="actions-empty">—</span>}
                   </td>
                 </tr>
               ))}

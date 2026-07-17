@@ -132,7 +132,7 @@ export default function HousekeepingPage({ branches, branchId, setBranchId }) {
                   <td className="mono">{roomNo(t.roomId)}</td>
                   <td>{t.description}</td>
                   <td><StatusBadge value={t.status} /></td>
-                  <td>{TASK_NEXT[t.status] && <button className="mini-btn" onClick={() => advanceTask(t)}>Mark {TASK_NEXT[t.status]}</button>}</td>
+                  <td className="actions">{TASK_NEXT[t.status] ? <button className="mini-btn" onClick={() => advanceTask(t)}>Mark {TASK_NEXT[t.status]}</button> : <span className="actions-empty">—</span>}</td>
                 </tr>
               ))}
               {branchTasks.length === 0 && <tr><td colSpan="4" className="empty">No housekeeping tasks for this branch.</td></tr>}
@@ -149,7 +149,7 @@ export default function HousekeepingPage({ branches, branchId, setBranchId }) {
                   <td>{m.priority}</td>
                   <td>{m.description}</td>
                   <td><StatusBadge value={m.status} /></td>
-                  <td>{MAINT_NEXT[m.status] && <button className="mini-btn" onClick={() => advanceMaint(m)}>Mark {MAINT_NEXT[m.status]}</button>}</td>
+                  <td className="actions">{MAINT_NEXT[m.status] ? <button className="mini-btn" onClick={() => advanceMaint(m)}>Mark {MAINT_NEXT[m.status]}</button> : <span className="actions-empty">—</span>}</td>
                 </tr>
               ))}
               {branchMaint.length === 0 && <tr><td colSpan="5" className="empty">No maintenance reports for this branch.</td></tr>}

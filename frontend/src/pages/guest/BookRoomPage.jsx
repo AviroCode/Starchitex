@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client.js'
 import Banner from '../../components/Banner.jsx'
-import KeyTag from '../../components/KeyTag.jsx'
 import BranchPicker from '../../components/BranchPicker.jsx'
+import PhotoPlaceholder from '../../components/PhotoPlaceholder.jsx'
 
 const REJECTION_HINT =
   'The database rejected this — likely check-out is not after check-in, or that room is already booked for those dates.'
@@ -27,10 +27,12 @@ export default function BookRoomPage({ branches, guestId }) {
     api.roomsByBranch(branchId).then(setRooms).catch((e) => setError(e.message))
   }, [branchId])
 
-  const typeName = useMemo(() => {
-    const m = new Map(types.map((t) => [t.roomTypeId, t.typeName]))
+  const typeInfo = useMemo(() => {
+    const m = new Map(types.map((t) => [t.roomTypeId, t]))
     return (id) => m.get(id)
   }, [types])
+
+  const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 0 })
 
   const book = async (room) => {
     if (!checkIn || !checkOut) { setError('Pick check-in and check-out dates first.'); return }
@@ -85,15 +87,31 @@ export default function BookRoomPage({ branches, guestId }) {
         <p className="hint">Pick your dates, then choose a room below — the database rejects the booking if that room is already taken for those dates.</p>
       </div>
 
-      <div className="key-rack">
-        {rooms.map((r) => (
-          <div key={r.roomId} className="key-tag-wrap">
-            <KeyTag room={r} typeName={typeName(r.roomTypeId)} />
-            <button className="mini-btn book-btn" disabled={booking === r.roomId} onClick={() => book(r)}>
-              {booking === r.roomId ? 'Booking…' : 'Book this room'}
-            </button>
-          </div>
-        ))}
+      <div className="room-grid">
+        {rooms.map((r) => {
+          const t = typeInfo(r.roomTypeId)
+          return (
+            <div key={r.roomId} className="room-card">
+              <PhotoPlaceholder label={`${t?.typeName ?? 'Room'} ${r.roomNumber} — photo coming soon`} />
+              <div className="room-card-body">
+                <div className="room-card-head">
+                  <span className="room-no mono">{r.roomNumber}</span>
+                  {t && (
+                    <span className="room-card-price">
+                      ฿ {fmt(t.basePrice)}
+                      <span className="per-night">per night</span>
+                    </span>
+                  )}
+                </div>
+                <span className="rtype">{t?.typeName}</span>
+                <span className="dim">Floor {r.floor} · sleeps up to {t?.capacity ?? '—'}</span>
+                <button className="mini-btn book-btn" disabled={booking === r.roomId} onClick={() => book(r)}>
+                  {booking === r.roomId ? 'Booking…' : 'Book this room'}
+                </button>
+              </div>
+            </div>
+          )
+        })}
         {rooms.length === 0 && <p className="empty">No rooms for this branch yet.</p>}
       </div>
     </section>
