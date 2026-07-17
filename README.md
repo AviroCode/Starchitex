@@ -1,21 +1,21 @@
 # Starchitex — Multi-Branch Hotel Management System
 
-Our database course term project. Starchitex is a centralized PostgreSQL database for a hotel chain with multiple branches — one shared database instead of each branch keeping its own copies of everything. It covers reservations, check-in/check-out, billing, service requests, housekeeping, maintenance, role-based access control, and audit logging, with virtually all of that business logic enforced **inside the database** via triggers, stored procedures, `CHECK` constraints, and native Row-Level Security — not just in application code.
+Our database course term project. Starchitex is a centralized PostgreSQL database for a hotel chain with multiple branches — one shared database instead of each branch keeping its own copies of everything. It covers reservations, check-in/check-out, billing, service requests, housekeeping, maintenance, role-based access control, and audit logging, with virtually all of that business logic enforced **inside the database** via triggers, stored procedures, `CHECK` constraints, and native Row-Level Security ,  not just in application code.
 
-On top of the database, this repo also includes a full working Spring Boot + React application (three separate consoles — Guest Portal, Staff Console, Admin Console) that exercises every piece of the schema for real. See **[Testing Guide for Instructors](#-testing-guide-for-instructors)** below for exactly how to drive it.
+On top of the database, this repo also includes a full working Spring Boot + React application (three separate consoles - Guest Portal, Staff Console, Admin Console) that exercises every piece of the schema for real. See **[Testing Guide](#-testing-guide-for-instructors)** below for exactly how to drive it.
 
 Team:
-- Aung Kaung Thar (6780844) — database implementation, backend
-- Elbin Ye Htet Naing (6781209) — RBAC & security design, frontend
-- Min Linn Khant (6780839) — testing/QA, deployment, monitoring
+- Aung Kaung Thar (6780844) — database implementation, backend and frontend 
+- Elbin Ye Htet Naing (6781209) — RBAC & security design and check the relations and features 
+- Min Linn Khant (6780839) — testing/QA, deployment, monitoring and frontend 
 
-A full narrative report (business context, ER diagrams, normalization walkthrough, data dictionary, advanced queries/triggers, challenges) lives in **[`DATABASE_REPORT.md`](DATABASE_REPORT.md)**.
+A full narrative report (business context, ER diagrams, normalization walkthrough, data dictionary, advanced queries/triggers, challenges) can see below .
 
 ## Repository layout
 
 - `backend/src/main/resources/schema.sql` — the entire schema: tables, constraints, triggers, stored procedures, views, and RLS policies, in dependency order.
 - `database/seed/seed_data.sql` — the minimal **production** bootstrap (fixed RBAC taxonomy + one branch + one admin login). This is what a real deploy applies.
-- `database/seed/demo_data.sql` — a **local-only** rich demo dataset (extra branch, rooms, staff, guests, live reservations) that gives an instructor something to click on immediately. Never used in production — see below.
+- `database/seed/demo_data.sql` — a **local-only** rich demo dataset (extra branch, rooms, staff, guests, live reservations) that gives something to click on immediately. Never used in production — see below.
 - `database/tests/*.sql` — the automated test suite (integrity constraints, full workflow lifecycles, housekeeping/maintenance, audit logging, RLS isolation). Each file prints its own PASS/FAIL lines.
 - `backend/` — Spring Boot 4 API (raw JDBC via `JdbcTemplate`, no ORM — every query is explicit SQL).
 - `frontend/` — React 18 + Vite, three role-driven consoles under `/guest/*`, `/staff/*`, `/admin/*`.
@@ -64,7 +64,7 @@ Each test prints its own PASS/FAIL lines, so the output is readable on its own. 
 
 ---
 
-## 🎓 Testing Guide for Instructors
+## Testing Guide
 
 Everything below assumes the Docker Quickstart above (`localhost:3000`) with the demo dataset loaded — no manual data entry required. Every login uses the password **`demo1234`**.
 
@@ -126,14 +126,14 @@ Go to `http://localhost:3000/login` to sign in with any of the above, or `http:/
 
 ---
 
-## 📖 Database Design Architecture
+##  Database Design Architecture
 This project designs a robust, enterprise-grade relational database for a multi-branch Hotel Management System. It supports the full hotel operation: room bookings, facility reservations, multi-department task assignment (housekeeping / maintenance), secure split billing, and a strict Role-Based Access Control (RBAC) security model.
 
 The database is normalized to Third Normal Form (3NF), enforces referential integrity through mandatory foreign keys, and isolates data per branch so that staff only ever see the location they belong to.
 
 ---
 
-## 🗂️ Entity Reference (26 Entities)
+## Entity Reference (26 Entities)
 
 ### Organization & People
 * **Branch** — `branch_id (PK)`, `name`, `address`, `city`, `province`, `postal_code`, `email`, `phone`, `status`
@@ -225,13 +225,13 @@ The database is normalized to Third Normal Form (3NF), enforces referential inte
 * `FacilityMaintenance.facility_id → Facility` · `FacilityMaintenance.reported_by / assigned_employee_id → Employee`
 * `AuditLog.employee_id → Employee`
 
-📈 **ER Diagrams (Lucidchart, editable):**
+ **ER Diagrams (Lucidchart, editable):**
 - Conceptual (major entities): https://lucid.app/lucidchart/3d1b3318-7870-4a4a-a655-82433e1291ce/edit
 - Full logical schema (all 26 tables): https://lucid.app/lucidchart/1f8f624d-995c-4d15-b6d1-78503add5c50/edit
 
 ---
 
-## 🔐 Security Design
+##  Security Design
 
 ### Login Authentication
 Users log in with a username (or email). Passwords are never stored in plain text — they are hashed with BCrypt. All queries use parameterized statements (`JdbcTemplate` with `?` placeholders throughout) to prevent SQL injection, and JWT sessions are stateless with explicit expiry.
@@ -286,7 +286,7 @@ Derived directly from the `RolePermission` rows in `database/seed/seed_data.sql`
 
 ---
 
-## 🔑 Permission Catalog (11 Permissions)
+##  Permission Catalog (11 Permissions)
 
 Matches `database/seed/seed_data.sql` exactly.
 
